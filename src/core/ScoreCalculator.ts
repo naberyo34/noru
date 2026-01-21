@@ -4,7 +4,7 @@
  * View非依存のコアロジック
  */
 
-import { JudgmentType, type PlayResult } from './ChartData';
+import { isLongNote, JudgmentType, type NoteData, type PlayResult } from './ChartData';
 
 /**
  * 判定ごとの基本スコア配分
@@ -41,8 +41,11 @@ export class ScoreCalculator {
     [JudgmentType.MISS]: number;
   };
 
-  constructor(totalNotes: number) {
-    this.totalNotes = totalNotes;
+  constructor(notes: NoteData[]) {
+    // ロングノートは2カウント（開始+終了）、通常ノートは1カウント
+    this.totalNotes = notes.reduce((count, note) => {
+      return count + (isLongNote(note) ? 2 : 1);
+    }, 0);
     this.judgmentCounts = {
       [JudgmentType.PERFECT]: 0,
       [JudgmentType.GREAT]: 0,

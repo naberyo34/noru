@@ -4,6 +4,7 @@
  */
 
 import Phaser from 'phaser';
+import { ANIMATION, JUDGMENT_COLORS_CSS, RESULT_UI } from '../config/GameConfig';
 import { JudgmentType, type PlayResult } from '../core/ChartData';
 
 export class ResultScene extends Phaser.Scene {
@@ -11,129 +12,145 @@ export class ResultScene extends Phaser.Scene {
     super({ key: 'ResultScene' });
   }
 
-  create(data: { result: PlayResult; chartTitle: string; chartArtist: string }) {
+  create(data: { result: PlayResult; chartMetadata: { title: string; artist: string } }) {
     const { width, height } = this.cameras.main;
-    const { result, chartTitle, chartArtist } = data;
+    const { result, chartMetadata } = data;
 
     // フェードイン
-    this.cameras.main.fadeIn(500, 0, 0, 0);
+    this.cameras.main.fadeIn(ANIMATION.FADE_IN_DURATION, 0, 0, 0);
 
     // 背景
-    this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.95);
+    this.add.rectangle(
+      width / 2,
+      height / 2,
+      width,
+      height,
+      RESULT_UI.BACKGROUND_COLOR,
+      RESULT_UI.BACKGROUND_ALPHA
+    );
 
     // タイトル
     this.add
-      .text(width / 2, 32, 'RESULT', {
-        fontSize: '19px',
-        color: '#ffffff',
+      .text(width / 2, RESULT_UI.TITLE_Y, 'RESULT', {
+        fontSize: RESULT_UI.TITLE_FONT,
+        color: RESULT_UI.TITLE_COLOR,
         fontStyle: 'bold',
       })
       .setOrigin(0.5);
 
     // 楽曲情報
     this.add
-      .text(width / 2, 52, chartTitle, {
-        fontSize: '10px',
-        color: '#cccccc',
+      .text(width / 2, RESULT_UI.SONG_TITLE_Y, chartMetadata.title, {
+        fontSize: RESULT_UI.SONG_TITLE_FONT,
+        color: RESULT_UI.SONG_TITLE_COLOR,
       })
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, 64, chartArtist, {
-        fontSize: '7px',
-        color: '#888888',
+      .text(width / 2, RESULT_UI.SONG_ARTIST_Y, chartMetadata.artist, {
+        fontSize: RESULT_UI.SONG_ARTIST_FONT,
+        color: RESULT_UI.SONG_ARTIST_COLOR,
       })
       .setOrigin(0.5);
 
     // スコア
     this.add
-      .text(width / 2, 88, `Score: ${result.score}`, {
-        fontSize: '14px',
-        color: '#ffffff',
+      .text(width / 2, RESULT_UI.SCORE_Y, `Score: ${result.score}`, {
+        fontSize: RESULT_UI.SCORE_FONT,
+        color: RESULT_UI.SCORE_COLOR,
       })
       .setOrigin(0.5);
 
     // 正確度
     const accuracyColor = this.getAccuracyColor(result.accuracy);
     this.add
-      .text(width / 2, 108, `Accuracy: ${result.accuracy.toFixed(2)}%`, {
-        fontSize: '11px',
+      .text(width / 2, RESULT_UI.ACCURACY_Y, `Accuracy: ${result.accuracy.toFixed(2)}%`, {
+        fontSize: RESULT_UI.ACCURACY_FONT,
         color: accuracyColor,
       })
       .setOrigin(0.5);
 
     // 最大コンボ
     this.add
-      .text(width / 2, 126, `Max Combo: ${result.maxCombo}`, {
-        fontSize: '10px',
-        color: '#ffff00',
+      .text(width / 2, RESULT_UI.MAX_COMBO_Y, `Max Combo: ${result.maxCombo}`, {
+        fontSize: RESULT_UI.MAX_COMBO_FONT,
+        color: RESULT_UI.MAX_COMBO_COLOR,
       })
       .setOrigin(0.5);
 
     // 判定カウント
-    const judgmentY = 152;
+    const judgmentY = RESULT_UI.JUDGMENT_TITLE_Y;
     const judgmentData = [
       {
         type: JudgmentType.PERFECT,
-        color: '#ffff00',
+        color: JUDGMENT_COLORS_CSS[JudgmentType.PERFECT],
         count: result.judgmentCounts[JudgmentType.PERFECT],
       },
       {
         type: JudgmentType.GREAT,
-        color: '#00ff00',
+        color: JUDGMENT_COLORS_CSS[JudgmentType.GREAT],
         count: result.judgmentCounts[JudgmentType.GREAT],
       },
       {
         type: JudgmentType.GOOD,
-        color: '#00ffff',
+        color: JUDGMENT_COLORS_CSS[JudgmentType.GOOD],
         count: result.judgmentCounts[JudgmentType.GOOD],
       },
-      { type: JudgmentType.BAD, color: '#ff8800', count: result.judgmentCounts[JudgmentType.BAD] },
+      {
+        type: JudgmentType.BAD,
+        color: JUDGMENT_COLORS_CSS[JudgmentType.BAD],
+        count: result.judgmentCounts[JudgmentType.BAD],
+      },
       {
         type: JudgmentType.MISS,
-        color: '#ff0000',
+        color: JUDGMENT_COLORS_CSS[JudgmentType.MISS],
         count: result.judgmentCounts[JudgmentType.MISS],
       },
     ];
 
     this.add
       .text(width / 2, judgmentY, 'Judgments', {
-        fontSize: '8px',
-        color: '#888888',
+        fontSize: RESULT_UI.JUDGMENT_TITLE_FONT,
+        color: RESULT_UI.JUDGMENT_TITLE_COLOR,
       })
       .setOrigin(0.5);
 
-    let currentY = judgmentY + 16;
+    let currentY = judgmentY + RESULT_UI.JUDGMENT_START_OFFSET;
     judgmentData.forEach(({ type, color, count }) => {
       this.add
-        .text(width / 2 - 40, currentY, `${type}:`, {
-          fontSize: '7px',
+        .text(width / 2 + RESULT_UI.JUDGMENT_LABEL_X_OFFSET, currentY, `${type}:`, {
+          fontSize: RESULT_UI.JUDGMENT_LABEL_FONT,
           color: color,
         })
         .setOrigin(1, 0.5);
 
       this.add
-        .text(width / 2 + 40, currentY, `${count}`, {
-          fontSize: '7px',
-          color: '#ffffff',
+        .text(width / 2 + RESULT_UI.JUDGMENT_VALUE_X_OFFSET, currentY, `${count}`, {
+          fontSize: RESULT_UI.JUDGMENT_VALUE_FONT,
+          color: RESULT_UI.JUDGMENT_VALUE_COLOR,
         })
         .setOrigin(1, 0.5);
 
-      currentY += 12;
+      currentY += RESULT_UI.JUDGMENT_ROW_GAP;
     });
 
     // 操作説明
     this.add
-      .text(width / 2, height - 24, 'ENTER / SPACE / Click : Back to Song Select', {
-        fontSize: '7px',
-        color: '#ffffff',
-      })
+      .text(
+        width / 2,
+        height - RESULT_UI.HINT1_OFFSET_Y,
+        'ENTER / SPACE / Click : Back to Song Select',
+        {
+          fontSize: RESULT_UI.HINT1_FONT,
+          color: RESULT_UI.HINT1_COLOR,
+        }
+      )
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, height - 12, 'ESC : Back to Title', {
-        fontSize: '6px',
-        color: '#888888',
+      .text(width / 2, height - RESULT_UI.HINT2_OFFSET_Y, 'ESC : Back to Title', {
+        fontSize: RESULT_UI.HINT2_FONT,
+        color: RESULT_UI.HINT2_COLOR,
       })
       .setOrigin(0.5);
 
@@ -149,11 +166,19 @@ export class ResultScene extends Phaser.Scene {
   }
 
   private getAccuracyColor(accuracy: number): string {
-    if (accuracy >= 95) return '#ffff00'; // Perfect
-    if (accuracy >= 90) return '#00ff00'; // Great
-    if (accuracy >= 80) return '#00ffff'; // Good
-    if (accuracy >= 70) return '#ff8800'; // Bad
-    return '#ff0000'; // Miss
+    if (accuracy >= RESULT_UI.ACCURACY_THRESHOLDS.PERFECT) {
+      return JUDGMENT_COLORS_CSS[JudgmentType.PERFECT];
+    }
+    if (accuracy >= RESULT_UI.ACCURACY_THRESHOLDS.GREAT) {
+      return JUDGMENT_COLORS_CSS[JudgmentType.GREAT];
+    }
+    if (accuracy >= RESULT_UI.ACCURACY_THRESHOLDS.GOOD) {
+      return JUDGMENT_COLORS_CSS[JudgmentType.GOOD];
+    }
+    if (accuracy >= RESULT_UI.ACCURACY_THRESHOLDS.BAD) {
+      return JUDGMENT_COLORS_CSS[JudgmentType.BAD];
+    }
+    return JUDGMENT_COLORS_CSS[JudgmentType.MISS];
   }
 
   private handleKeyInput(key: string) {
@@ -169,14 +194,14 @@ export class ResultScene extends Phaser.Scene {
   }
 
   private backToSongSelect() {
-    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.cameras.main.fadeOut(ANIMATION.FADE_OUT_TO_GAME, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.start('SongSelectScene');
     });
   }
 
   private backToTitle() {
-    this.cameras.main.fadeOut(500, 0, 0, 0);
+    this.cameras.main.fadeOut(ANIMATION.FADE_OUT_DURATION, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.start('TitleScene');
     });

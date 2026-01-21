@@ -11,30 +11,44 @@
 ### 基本方針：コアロジックとViewの完全分離
 
 ```
-┌─────────────────────────────────────┐
-│  View Layer (Phaser 3 依存)         │
-│  src/scenes/*                       │
-│  - TitleScene                       │
-│  - SongSelectScene                  │
-│  - GameScene                        │
-│  - ResultScene                      │
-└─────────────┬───────────────────────┘
-              │ uses
-              ↓
-┌─────────────────────────────────────┐
-│  Core Layer (View 非依存)           │
-│  src/core/*                         │
-│  - ChartData (型定義)                │
-│  - AudioSyncEngine (音楽同期)        │
-│  - JudgmentSystem (判定ロジック)     │
-│  - ScoreCalculator (スコア計算)      │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│  View Layer (Phaser 3 依存)                             │
+│  src/scenes/*                                           │
+│  - TitleScene                                           │
+│  - SongSelectScene                                      │
+│  - GameScene                                            │
+│  - ResultScene                                          │
+└───────────────────┬─────────────────────────────────────┘
+                    │ uses
+                    ↓
+┌─────────────────────────────────────────────────────────┐
+│  Manager Layer (Scene 責務分離)                         │
+│  src/managers/*                                         │
+│  - NoteManager (ノート生成・更新・削除)                  │
+│  - UIManager (UI要素管理)                               │
+│  - EffectManager (エフェクト表示)                       │
+│  - InputManager (入力処理)                              │
+└───────────────────┬─────────────────────────────────────┘
+                    │ uses
+                    ↓
+┌─────────────────────────────────────────────────────────┐
+│  Core Layer (View 非依存)                               │
+│  src/core/*                                             │
+│  - ChartData (型定義)                                   │
+│  - AudioSyncEngine (音楽同期)                           │
+│  - JudgmentSystem (判定ロジック)                        │
+│  - ScoreCalculator (スコア計算)                         │
+└─────────────────────────────────────────────────────────┘
 ```
 
 **重要な設計思想：**
-- Core Layerは**Phaserに依存しない**
-- 将来、譜面エディタを別UIフレームワーク（React等）で実装可能
-- Core Layerのテストが容易
+- **Core Layerは Phaser に依存しない**
+  - 将来、譜面エディタを別UIフレームワーク（React等）で実装可能
+  - Core Layerのテストが容易
+- **Manager Layerで Scene の責務を分離**
+  - GameScene が肥大化するのを防ぐ
+  - 機能単位でコードを分割し、保守性を向上
+  - 各マネージャーは単一責任を持つ
 
 ---
 
@@ -49,10 +63,15 @@ src/
 │   ├── AudioSyncEngine.ts
 │   ├── JudgmentSystem.ts
 │   └── ScoreCalculator.ts
+├── managers/            # Scene責務分離（★重要）
+│   ├── NoteManager.ts       # ノート生成・更新・削除
+│   ├── UIManager.ts         # UI要素管理
+│   ├── EffectManager.ts     # エフェクト表示
+│   └── InputManager.ts      # 入力処理
 ├── scenes/              # Phaserシーン（View層）
 │   ├── TitleScene.ts
 │   ├── SongSelectScene.ts
-│   ├── GameScene.ts     # 最も複雑なシーン
+│   ├── GameScene.ts     # マネージャーを統括
 │   └── ResultScene.ts
 ├── types/               # 共通型定義
 │   └── Song.ts
@@ -257,6 +276,152 @@ this.add.text(x, y, 'PERFECT', { color: JUDGMENT_COLORS_CSS[JudgmentType.PERFECT
 
 ---
 
+## 🎨 マネージャーパターン
+
+### Scene の肥大化を防ぐ設計
+
+GameScene は以下のマネージャークラスを使用して責務を分離しています。
+
+### 各マネージャーの責務
+
+#### 1. **NoteManager** (`src/managers/NoteManager.ts`)
+```typescript
+// 責務：ノートの生成・更新・削除
+class NoteManager {
+  spawnNotes(currentTime: number): void          // ノート生成
+  updateNotes(currentTime: number): void         // 位置更新
+  removeFinishedNotes(currentTime: number): void // 削除
+  getActiveNotes(): ActiveNote[]                 // 取得
+}
+
+// GameScene での使用例
+create() {
+  this.noteManager = new NoteManager(this, this.chartData, lanePositions);
+}
+
+update() {
+  this.noteManager.spawnNotes(currentTime);
+  this.noteManager.updateNotes(currentTime);
+}
+```
+
+#### 2. **UIManager** (`src/managers/UIManager.ts`)
+```typescript
+// 責務：UI要素の管理
+class UIManager {
+  setupUI(): void                    // 基本UI作成
+  setupLanes(onPress, onRelease): void // レーン作成
+  updateScore(score: number): void   // スコア更新
+  highlightLane(lane: number): void  // ハイライト
+}
+
+// GameScene での使用例
+create() {
+  this.uiManager = new UIManager(this);
+  this.uiManager.setupUI();
+  this.uiManager.setupLanes(...);
+}
+```
+
+#### 3. **EffectManager** (`src/managers/EffectManager.ts`)
+```typescript
+// 責務：エフェクト表示
+class EffectManager {
+  showHitEffect(x, y, judgment): void         // ヒットエフェクト
+  showJudgmentText(judgment, combo): void     // 判定テキスト
+  startHoldingEffect(note, x, y, judgment): void  // 長押しエフェクト開始
+  stopHoldingEffect(noteId): void             // 長押しエフェクト停止
+}
+
+// GameScene での使用例
+handleJudgment(result) {
+  this.effectManager.showHitEffect(x, y, result.judgment);
+  this.effectManager.showJudgmentText(result.judgment, combo);
+}
+```
+
+#### 4. **InputManager** (`src/managers/InputManager.ts`)
+```typescript
+// 責務：入力処理
+class InputManager {
+  setupKeyboard(): void                  // キーボード設定
+  isKeyPressed(lane: number): boolean    // キー状態取得
+}
+
+// GameScene での使用例
+create() {
+  this.inputManager = new InputManager(
+    this,
+    (lane) => this.handleLaneInput(lane),
+    (lane) => this.handleLaneRelease(lane)
+  );
+  this.inputManager.setupKeyboard();
+}
+```
+
+### GameScene のシンプル化
+
+**Before（888行）：**
+- ノート生成、UI管理、エフェクト、入力処理がすべて GameScene に混在
+- メソッドが多く、責務が不明確
+- テストや保守が困難
+
+**After（約400行）：**
+```typescript
+export class GameScene extends Phaser.Scene {
+  // マネージャーを保持
+  private noteManager!: NoteManager;
+  private uiManager!: UIManager;
+  private effectManager!: EffectManager;
+  private inputManager!: InputManager;
+
+  create() {
+    // マネージャーを初期化
+    this.uiManager = new UIManager(this);
+    this.effectManager = new EffectManager(this);
+    this.inputManager = new InputManager(this, ...);
+    this.noteManager = new NoteManager(this, ...);
+  }
+
+  update() {
+    // マネージャーに処理を委譲
+    this.noteManager.spawnNotes(currentTime);
+    this.noteManager.updateNotes(currentTime);
+  }
+}
+```
+
+### 新しい機能を追加する場合
+
+**例：新しいエフェクトを追加**
+1. `EffectManager.ts` に新メソッドを追加
+2. `GameScene` から呼び出すだけ
+
+**例：新しいUI要素を追加**
+1. `UIManager.ts` に新メソッドを追加
+2. 必要な設定を `GameConfig.ts` に追加
+
+**マネージャーを追加する場合：**
+1. `src/managers/NewManager.ts` を作成
+2. `GameScene` の `create()` で初期化
+3. 必要に応じて `update()` や他のメソッドから呼び出す
+
+### 注意点
+
+- **マネージャー間の依存は最小限に**
+  - 基本的に GameScene 経由で連携する
+  - 直接依存させない（循環参照を防ぐ）
+  
+- **Scene への参照は `private scene: Phaser.Scene` で保持**
+  - マネージャーから Phaser の機能にアクセス可能
+  - `this.scene.add.text(...)` など
+
+- **cleanup() を忘れずに**
+  - `shutdown()` でマネージャーの `cleanup()` を呼ぶ
+  - メモリリーク防止
+
+---
+
 ## 🚨 注意事項・既知の問題
 
 ### 1. **解像度は 320×240 固定**
@@ -356,9 +521,35 @@ npm run lint  # 自動修正
 - 設定値は `src/config/GameConfig.ts` に集約
 
 ### コメント
+
+**重要：コメントは「なぜそうなっているか」を説明する**
+
+#### ❌ 悪い例（作業履歴を書いている）
+```typescript
+// pointeroutは削除（長押し中に指が動いてもミス扱いにしない）
+// ここに追加
+// XXXを修正
+```
+
+#### ✅ 良い例（理由や意図を説明している）
+```typescript
+// pointeroutイベントは使用しない（長押し中に指が少し動いてもミス扱いにならないようにするため）
+// キーリピートを無視（長押し中の連続発火を防ぐ）
+// 通常ノートは判定済みならactiveNotesから削除されているはずだが、念のため画面外チェック
+```
+
+#### コメントのガイドライン
+- **作業履歴ではなく、コードの意図を説明する**
+- 「追加」「削除」「修正」などの作業単位ではなく、「なぜこうなっているか」を書く
+- コードから明らかなことは書かない
 - JSDoc は主要な public API のみ
 - 複雑なロジックには説明コメント
 - TODO コメントは避ける（Issue を使用）
+
+#### 不要なコードの削除
+- 使わなくなったコードは削除する（コメントアウトして残さない）
+- 後方互換性を無駄に残さない
+- git履歴があるので、削除しても問題ない
 
 ---
 
@@ -407,9 +598,12 @@ DEFAULT_JUDGMENT_WINDOW = {
 
 1. **設定値は GameConfig.ts に集約**
 2. **Core Layer を View から独立させる**
-3. **音楽時刻ベースで計算する（フレーム依存にしない）**
-4. **Phaser シーンの再利用を意識する（初期化とクリーンアップ）**
-5. **型安全性を保つ（any 禁止）**
+3. **マネージャーパターンで Scene の肥大化を防ぐ**
+   - 新機能は適切なマネージャーに追加
+   - Scene が 500 行を超えたら分割を検討
+4. **音楽時刻ベースで計算する（フレーム依存にしない）**
+5. **Phaser シーンの再利用を意識する（初期化とクリーンアップ）**
+6. **型安全性を保つ（any 禁止）**
 
 ---
 

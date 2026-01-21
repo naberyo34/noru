@@ -15,6 +15,17 @@ export enum JudgmentType {
 }
 
 /**
+ * ロングノートの状態
+ */
+export enum LongNoteState {
+  NOT_STARTED = 'NOT_STARTED', // まだ押されていない
+  HOLDING = 'HOLDING', // 押している（開始判定成功）
+  START_MISSED = 'START_MISSED', // 開始判定ミス
+  RELEASED_EARLY = 'RELEASED_EARLY', // 早く離した
+  COMPLETED = 'COMPLETED', // 終了判定完了
+}
+
+/**
  * 判定ウィンドウ設定（ミリ秒）
  */
 export interface JudgmentWindow {
@@ -39,7 +50,8 @@ export const DEFAULT_JUDGMENT_WINDOW: JudgmentWindow = {
  */
 export interface NoteData {
   lane: number; // レーン番号 (0-7)
-  timing: number; // 出現タイミング（ミリ秒）
+  timing: number; // 開始タイミング（ミリ秒）
+  endTiming?: number; // 終了タイミング（ミリ秒）- ロングノートの場合のみ
   id?: string; // ノート識別用ID（オプショナル）
 }
 
@@ -72,8 +84,13 @@ export interface ChartData {
  */
 export interface ActiveNote extends NoteData {
   id: string; // 必須のID
-  judged: boolean; // 判定済みか
+  judged: boolean; // 判定済みか（通常ノートまたはロングノート全体）
   judgmentType?: JudgmentType; // 判定結果
+
+  // ロングノート用フィールド
+  longNoteState?: LongNoteState; // ロングノートの状態
+  startJudgment?: JudgmentType; // 開始判定結果
+  endJudgment?: JudgmentType; // 終了判定結果
 }
 
 /**
@@ -134,4 +151,42 @@ export function getLaneFromKey(key: string): number | null {
  */
 export function getKeyFromLane(lane: number): LaneKey | null {
   return LANE_KEYS[lane] ?? null;
+}
+
+/**
+ * ヘルパー関数: ロングノートかどうかを判定
+ */
+export function isLongNote(note: NoteData): boolean {
+  return note.endTiming !== undefined && note.endTiming > note.timing;
+}
+
+/**
+ * ヘルパー関数: ロングノートの開始判定が完了しているか
+ */
+export function isLongNoteStartJudged(note: ActiveNote): boolean {
+  if (!isLongNote(note)) return false;
+  return (
+    note.longNoteState === LongNoteState.HOLDING ||
+    note.longNoteState === LongNoteState.START_MISSED ||
+    note.longNoteState === LongNoteState.RELEASED_EARLY ||
+    note.longNoteState === LongNoteState.COMPLETED
+  );
+}
+
+/**
+ * ヘルパー関数: ロングノートの終了判定が完了しているか
+ */
+export function isLongNoteEndJudged(note: ActiveNote): boolean {
+  if (!isLongNote(note)) return false;
+  return (
+    note.longNoteState === LongNoteState.RELEASED_EARLY ||
+    note.longNoteState === LongNoteState.COMPLETED
+  );
+}
+
+/**
+ * ヘルパー関数: ロングノートを押している状態か
+ */
+export function isLongNoteHolding(note: ActiveNote): boolean {
+  return note.longNoteState === LongNoteState.HOLDING;
 }

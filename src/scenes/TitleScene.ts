@@ -4,6 +4,7 @@
  */
 
 import Phaser from 'phaser';
+import { ANIMATION, TITLE_SCREEN } from '../config/GameConfig';
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -14,38 +15,43 @@ export class TitleScene extends Phaser.Scene {
     const { width, height } = this.cameras.main;
 
     // 背景
-    this.add.rectangle(width / 2, height / 2, width, height, 0x0a0a1e);
+    this.add.rectangle(width / 2, height / 2, width, height, TITLE_SCREEN.BACKGROUND_COLOR);
 
     // タイトルロゴ
     this.add
-      .text(width / 2, height / 2 - 32, 'NORU', {
-        fontSize: '38px',
-        color: '#ffffff',
+      .text(width / 2, height / 2 + TITLE_SCREEN.TITLE_OFFSET_Y, 'NORU', {
+        fontSize: TITLE_SCREEN.TITLE_FONT,
+        color: TITLE_SCREEN.TITLE_COLOR,
         fontStyle: 'bold',
       })
       .setOrigin(0.5);
 
     // サブタイトル
     this.add
-      .text(width / 2, height / 2 + 8, 'Rhythm Game', {
-        fontSize: '13px',
-        color: '#888888',
+      .text(width / 2, height / 2 + TITLE_SCREEN.SUBTITLE_OFFSET_Y, 'Rhythm Game', {
+        fontSize: TITLE_SCREEN.SUBTITLE_FONT,
+        color: TITLE_SCREEN.SUBTITLE_COLOR,
       })
       .setOrigin(0.5);
 
     // スタートプロンプト
     const startText = this.add
-      .text(width / 2, height / 2 + 48, 'Press ENTER or Click to Start', {
-        fontSize: '10px',
-        color: '#ffffff',
-      })
+      .text(
+        width / 2,
+        height / 2 + TITLE_SCREEN.START_PROMPT_OFFSET_Y,
+        'Press ENTER or Click to Start',
+        {
+          fontSize: TITLE_SCREEN.START_PROMPT_FONT,
+          color: TITLE_SCREEN.START_PROMPT_COLOR,
+        }
+      )
       .setOrigin(0.5);
 
     // 点滅アニメーション
     this.tweens.add({
       targets: startText,
-      alpha: 0.3,
-      duration: 1000,
+      alpha: TITLE_SCREEN.START_PROMPT_MIN_ALPHA,
+      duration: TITLE_SCREEN.START_PROMPT_BLINK_DURATION,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
@@ -53,9 +59,9 @@ export class TitleScene extends Phaser.Scene {
 
     // バージョン表示
     this.add
-      .text(width - 8, height - 8, 'v0.1.0', {
-        fontSize: '6px',
-        color: '#444444',
+      .text(width - TITLE_SCREEN.VERSION_OFFSET, height - TITLE_SCREEN.VERSION_OFFSET, 'v0.1.0', {
+        fontSize: TITLE_SCREEN.VERSION_FONT,
+        color: TITLE_SCREEN.VERSION_COLOR,
       })
       .setOrigin(1, 1);
 
@@ -65,7 +71,7 @@ export class TitleScene extends Phaser.Scene {
     const startGame = () => {
       if (started) return;
       started = true;
-      this.cameras.main.fadeOut(500, 0, 0, 0);
+      this.cameras.main.fadeOut(ANIMATION.FADE_OUT_DURATION, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
         this.scene.start('SongSelectScene');
       });

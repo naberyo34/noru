@@ -4,6 +4,7 @@
  */
 
 import Phaser from 'phaser';
+import { ANIMATION, SONG_SELECT_UI } from '../config/GameConfig';
 import type { Song } from '../types/Song';
 
 export class SongSelectScene extends Phaser.Scene {
@@ -24,7 +25,7 @@ export class SongSelectScene extends Phaser.Scene {
     const { width, height } = this.cameras.main;
 
     // フェードイン
-    this.cameras.main.fadeIn(500, 0, 0, 0);
+    this.cameras.main.fadeIn(ANIMATION.FADE_IN_DURATION, 0, 0, 0);
 
     // 楽曲リストを取得
     this.songs = this.cache.json.get('songs') as Song[];
@@ -40,13 +41,13 @@ export class SongSelectScene extends Phaser.Scene {
     }
 
     // 背景
-    this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a2e);
+    this.add.rectangle(width / 2, height / 2, width, height, SONG_SELECT_UI.BACKGROUND_COLOR);
 
     // タイトル
     this.add
-      .text(width / 2, 16, 'SONG SELECT', {
-        fontSize: '14px',
-        color: '#ffffff',
+      .text(width / 2, SONG_SELECT_UI.TITLE_Y, 'SONG SELECT', {
+        fontSize: SONG_SELECT_UI.TITLE_FONT,
+        color: SONG_SELECT_UI.TITLE_COLOR,
         fontStyle: 'bold',
       })
       .setOrigin(0.5);
@@ -56,23 +57,33 @@ export class SongSelectScene extends Phaser.Scene {
 
     // 操作説明
     this.add
-      .text(width / 2, height - 40, '← → : Change Song  |  ↑ ↓ : Change Difficulty', {
-        fontSize: '6px',
-        color: '#888888',
-      })
+      .text(
+        width / 2,
+        height - SONG_SELECT_UI.HINT1_OFFSET_Y,
+        '← → : Change Song  |  ↑ ↓ : Change Difficulty',
+        {
+          fontSize: SONG_SELECT_UI.HINT1_FONT,
+          color: SONG_SELECT_UI.HINT1_COLOR,
+        }
+      )
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, height - 28, 'ENTER / SPACE / Click : Start Game', {
-        fontSize: '7px',
-        color: '#ffffff',
-      })
+      .text(
+        width / 2,
+        height - SONG_SELECT_UI.HINT2_OFFSET_Y,
+        'ENTER / SPACE / Click : Start Game',
+        {
+          fontSize: SONG_SELECT_UI.HINT2_FONT,
+          color: SONG_SELECT_UI.HINT2_COLOR,
+        }
+      )
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, height - 16, 'ESC : Back to Title', {
-        fontSize: '6px',
-        color: '#888888',
+      .text(width / 2, height - SONG_SELECT_UI.HINT3_OFFSET_Y, 'ESC : Back to Title', {
+        fontSize: SONG_SELECT_UI.HINT3_FONT,
+        color: SONG_SELECT_UI.HINT3_COLOR,
       })
       .setOrigin(0.5);
 
@@ -93,46 +104,41 @@ export class SongSelectScene extends Phaser.Scene {
     const difficulty = song.difficulties[this.selectedDifficultyIndex];
 
     // 楽曲情報エリア
-    const infoY = height / 2 - 24;
+    const infoY = height / 2 + SONG_SELECT_UI.INFO_BASE_OFFSET_Y;
 
     // 楽曲タイトル
     this.add
       .text(width / 2, infoY, song.title, {
-        fontSize: '19px',
-        color: '#ffffff',
+        fontSize: SONG_SELECT_UI.SONG_TITLE_FONT,
+        color: SONG_SELECT_UI.SONG_TITLE_COLOR,
         fontStyle: 'bold',
       })
       .setOrigin(0.5);
 
     // アーティスト
     this.add
-      .text(width / 2, infoY + 24, song.artist, {
-        fontSize: '10px',
-        color: '#cccccc',
+      .text(width / 2, infoY + SONG_SELECT_UI.ARTIST_OFFSET_Y, song.artist, {
+        fontSize: SONG_SELECT_UI.ARTIST_FONT,
+        color: SONG_SELECT_UI.ARTIST_COLOR,
       })
       .setOrigin(0.5);
 
     // BPM
     this.add
-      .text(width / 2, infoY + 40, `BPM: ${song.bpm}`, {
-        fontSize: '8px',
-        color: '#888888',
+      .text(width / 2, infoY + SONG_SELECT_UI.BPM_OFFSET_Y, `BPM: ${song.bpm}`, {
+        fontSize: SONG_SELECT_UI.BPM_FONT,
+        color: SONG_SELECT_UI.BPM_COLOR,
       })
       .setOrigin(0.5);
 
     // 難易度
-    const difficultyColors: { [key: string]: string } = {
-      EASY: '#00ff00',
-      NORMAL: '#00ffff',
-      HARD: '#ffff00',
-      EXPERT: '#ff8800',
-      MASTER: '#ff0000',
-    };
-
     this.add
-      .text(width / 2, infoY + 64, difficulty.level, {
-        fontSize: '13px',
-        color: difficultyColors[difficulty.level] || '#ffffff',
+      .text(width / 2, infoY + SONG_SELECT_UI.DIFFICULTY_OFFSET_Y, difficulty.level, {
+        fontSize: SONG_SELECT_UI.DIFFICULTY_FONT,
+        color:
+          SONG_SELECT_UI.DIFFICULTY_COLORS[
+            difficulty.level as keyof typeof SONG_SELECT_UI.DIFFICULTY_COLORS
+          ] || SONG_SELECT_UI.TITLE_COLOR,
         fontStyle: 'bold',
       })
       .setOrigin(0.5);
@@ -140,19 +146,24 @@ export class SongSelectScene extends Phaser.Scene {
     // 難易度星
     const stars = '★'.repeat(difficulty.stars) + '☆'.repeat(10 - difficulty.stars);
     this.add
-      .text(width / 2, infoY + 80, stars, {
-        fontSize: '10px',
-        color: '#ffff00',
+      .text(width / 2, infoY + SONG_SELECT_UI.STAR_OFFSET_Y, stars, {
+        fontSize: SONG_SELECT_UI.STAR_FONT,
+        color: SONG_SELECT_UI.STAR_COLOR,
       })
       .setOrigin(0.5);
 
     // 楽曲インデックス表示
     if (this.songs.length > 1) {
       this.add
-        .text(width / 2, infoY + 100, `${this.selectedSongIndex + 1} / ${this.songs.length}`, {
-          fontSize: '7px',
-          color: '#666666',
-        })
+        .text(
+          width / 2,
+          infoY + SONG_SELECT_UI.INDEX_OFFSET_Y,
+          `${this.selectedSongIndex + 1} / ${this.songs.length}`,
+          {
+            fontSize: SONG_SELECT_UI.INDEX_FONT,
+            color: SONG_SELECT_UI.INDEX_COLOR,
+          }
+        )
         .setOrigin(0.5);
     }
   }
@@ -208,7 +219,7 @@ export class SongSelectScene extends Phaser.Scene {
     const difficulty = song.difficulties[this.selectedDifficultyIndex];
 
     // GameSceneにデータを渡す
-    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.cameras.main.fadeOut(ANIMATION.FADE_OUT_TO_GAME, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.start('GameScene', {
         chartFile: difficulty.chartFile,
@@ -217,7 +228,7 @@ export class SongSelectScene extends Phaser.Scene {
   }
 
   private backToTitle() {
-    this.cameras.main.fadeOut(500, 0, 0, 0);
+    this.cameras.main.fadeOut(ANIMATION.FADE_OUT_DURATION, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.start('TitleScene');
     });
