@@ -4,7 +4,7 @@
  * View非依存のコアロジック
  */
 
-import { JudgmentType, PlayResult } from './ChartData';
+import { JudgmentType, type PlayResult } from './ChartData';
 
 /**
  * 判定ごとの基本スコア配分
@@ -62,11 +62,11 @@ export class ScoreCalculator {
 
     // 基本スコアを加算
     const baseScore = JUDGMENT_SCORES[judgment];
-    
+
     // コンボボーナスを計算（コンボが続くほどスコアが増える）
     const comboMultiplier = 1 + Math.floor(this.currentCombo / 10) * 0.1;
     const finalScore = Math.floor(baseScore * comboMultiplier);
-    
+
     this.currentScore += finalScore;
 
     // コンボ管理

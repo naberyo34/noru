@@ -4,10 +4,7 @@
     "artist": "Noru Dev Team",
     "audioFile": "assets/audio/test-song.wav",
     "bpm": 120,
-    "timeSignature": [
-      4,
-      4
-    ],
+    "timeSignature": [4, 4],
     "offset": 0
   },
   "notes": [

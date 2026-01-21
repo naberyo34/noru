@@ -21,18 +21,18 @@ export const GAMEPLAY = {
   // レーン設定
   LANE_WIDTH: 32,
   LANE_Y_CENTER: 140,
-  
+
   // ノート設定
   NOTE_SIZE: 24,
   NOTE_SPEED: 160, // ピクセル/秒
   NOTE_SPAWN_Y: 0,
-  
+
   // 判定設定
   JUDGMENT_LINE_Y: 200,
-  
+
   // 計算値
   get NOTE_TRAVEL_TIME() {
-    return (this.JUDGMENT_LINE_Y - this.NOTE_SPAWN_Y) / this.NOTE_SPEED * 1000;
+    return ((this.JUDGMENT_LINE_Y - this.NOTE_SPAWN_Y) / this.NOTE_SPEED) * 1000;
   },
 } as const;
 
@@ -82,11 +82,11 @@ export const EFFECTS = {
   HIT_PARTICLE_COUNT: 4,
   HIT_PARTICLE_DISTANCE: 20,
   HIT_PARTICLE_DURATION: 300,
-  
+
   // 判定テキスト
   JUDGMENT_TEXT_Y: 168,
   JUDGMENT_TEXT_DURATION: 500,
-  
+
   // カウントダウン
   COUNTDOWN_DURATION: 600,
   COUNTDOWN_START_DURATION: 500,
@@ -104,7 +104,7 @@ export const UI = {
   FONT_COUNTDOWN: '29px',
   FONT_COUNTDOWN_START: '19px',
   FONT_LANE_KEY: '10px',
-  
+
   // 配置
   SCORE_X: 4,
   SCORE_Y: 4,

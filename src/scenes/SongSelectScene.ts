@@ -4,7 +4,7 @@
  */
 
 import Phaser from 'phaser';
-import { Song } from '../types/Song';
+import type { Song } from '../types/Song';
 
 export class SongSelectScene extends Phaser.Scene {
   private songs: Song[] = [];
@@ -30,10 +30,12 @@ export class SongSelectScene extends Phaser.Scene {
     this.songs = this.cache.json.get('songs') as Song[];
 
     if (!this.songs || this.songs.length === 0) {
-      this.add.text(width / 2, height / 2, 'No songs available', {
-        fontSize: '24px',
-        color: '#ff0000',
-      }).setOrigin(0.5);
+      this.add
+        .text(width / 2, height / 2, 'No songs available', {
+          fontSize: '24px',
+          color: '#ff0000',
+        })
+        .setOrigin(0.5);
       return;
     }
 
@@ -41,30 +43,38 @@ export class SongSelectScene extends Phaser.Scene {
     this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a2e);
 
     // タイトル
-    this.add.text(width / 2, 16, 'SONG SELECT', {
-      fontSize: '14px',
-      color: '#ffffff',
-      fontStyle: 'bold',
-    }).setOrigin(0.5);
+    this.add
+      .text(width / 2, 16, 'SONG SELECT', {
+        fontSize: '14px',
+        color: '#ffffff',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
 
     // 楽曲情報表示
     this.displaySongInfo();
 
     // 操作説明
-    this.add.text(width / 2, height - 40, '← → : Change Song  |  ↑ ↓ : Change Difficulty', {
-      fontSize: '6px',
-      color: '#888888',
-    }).setOrigin(0.5);
+    this.add
+      .text(width / 2, height - 40, '← → : Change Song  |  ↑ ↓ : Change Difficulty', {
+        fontSize: '6px',
+        color: '#888888',
+      })
+      .setOrigin(0.5);
 
-    this.add.text(width / 2, height - 28, 'ENTER / SPACE / Click : Start Game', {
-      fontSize: '7px',
-      color: '#ffffff',
-    }).setOrigin(0.5);
+    this.add
+      .text(width / 2, height - 28, 'ENTER / SPACE / Click : Start Game', {
+        fontSize: '7px',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5);
 
-    this.add.text(width / 2, height - 16, 'ESC : Back to Title', {
-      fontSize: '6px',
-      color: '#888888',
-    }).setOrigin(0.5);
+    this.add
+      .text(width / 2, height - 16, 'ESC : Back to Title', {
+        fontSize: '6px',
+        color: '#888888',
+      })
+      .setOrigin(0.5);
 
     // キーボード入力
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
@@ -86,23 +96,29 @@ export class SongSelectScene extends Phaser.Scene {
     const infoY = height / 2 - 24;
 
     // 楽曲タイトル
-    this.add.text(width / 2, infoY, song.title, {
-      fontSize: '19px',
-      color: '#ffffff',
-      fontStyle: 'bold',
-    }).setOrigin(0.5);
+    this.add
+      .text(width / 2, infoY, song.title, {
+        fontSize: '19px',
+        color: '#ffffff',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
 
     // アーティスト
-    this.add.text(width / 2, infoY + 24, song.artist, {
-      fontSize: '10px',
-      color: '#cccccc',
-    }).setOrigin(0.5);
+    this.add
+      .text(width / 2, infoY + 24, song.artist, {
+        fontSize: '10px',
+        color: '#cccccc',
+      })
+      .setOrigin(0.5);
 
     // BPM
-    this.add.text(width / 2, infoY + 40, `BPM: ${song.bpm}`, {
-      fontSize: '8px',
-      color: '#888888',
-    }).setOrigin(0.5);
+    this.add
+      .text(width / 2, infoY + 40, `BPM: ${song.bpm}`, {
+        fontSize: '8px',
+        color: '#888888',
+      })
+      .setOrigin(0.5);
 
     // 難易度
     const difficultyColors: { [key: string]: string } = {
@@ -113,25 +129,31 @@ export class SongSelectScene extends Phaser.Scene {
       MASTER: '#ff0000',
     };
 
-    this.add.text(width / 2, infoY + 64, difficulty.level, {
-      fontSize: '13px',
-      color: difficultyColors[difficulty.level] || '#ffffff',
-      fontStyle: 'bold',
-    }).setOrigin(0.5);
+    this.add
+      .text(width / 2, infoY + 64, difficulty.level, {
+        fontSize: '13px',
+        color: difficultyColors[difficulty.level] || '#ffffff',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
 
     // 難易度星
     const stars = '★'.repeat(difficulty.stars) + '☆'.repeat(10 - difficulty.stars);
-    this.add.text(width / 2, infoY + 80, stars, {
-      fontSize: '10px',
-      color: '#ffff00',
-    }).setOrigin(0.5);
+    this.add
+      .text(width / 2, infoY + 80, stars, {
+        fontSize: '10px',
+        color: '#ffff00',
+      })
+      .setOrigin(0.5);
 
     // 楽曲インデックス表示
     if (this.songs.length > 1) {
-      this.add.text(width / 2, infoY + 100, `${this.selectedSongIndex + 1} / ${this.songs.length}`, {
-        fontSize: '7px',
-        color: '#666666',
-      }).setOrigin(0.5);
+      this.add
+        .text(width / 2, infoY + 100, `${this.selectedSongIndex + 1} / ${this.songs.length}`, {
+          fontSize: '7px',
+          color: '#666666',
+        })
+        .setOrigin(0.5);
     }
   }
 

@@ -328,14 +328,27 @@ activeLanes: [0, 1, 2, 3] // 4レーンモード
 
 ### TypeScript
 - `strict: true` 必須
-- `any` 型の使用禁止
+- `any` 型の使用禁止（Biomeで警告）
 - enum または union type で状態管理
+
+### コードスタイル（Biome管理）
+- **インデント**: 2スペース
+- **クォート**: シングルクォート (`'`)
+- **セミコロン**: 必須
+- **行の長さ**: 100文字まで
+- **import順序**: 自動整列
+
+コードを書いたら必ず以下を実行：
+```bash
+npm run lint  # 自動修正
+```
 
 ### 命名規則
 - クラス・型：PascalCase (`GameScene`, `ChartData`)
 - 関数・変数：camelCase (`getCurrentTime`, `noteIndex`)
 - 定数：UPPER_SNAKE_CASE (`LANE_COUNT`, `NOTE_SPEED`)
 - private メソッド：`private showEffect()` (prefix 不要)
+- 未使用変数：アンダースコアプレフィックス (`_unused`)
 
 ### ファイル構成
 - 1ファイル1クラス原則

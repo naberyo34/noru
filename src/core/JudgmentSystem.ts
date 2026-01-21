@@ -5,10 +5,10 @@
  */
 
 import {
-  JudgmentType,
-  JudgmentWindow,
+  type ActiveNote,
   DEFAULT_JUDGMENT_WINDOW,
-  ActiveNote,
+  JudgmentType,
+  type JudgmentWindow,
 } from './ChartData';
 
 export interface JudgmentResult {
@@ -31,15 +31,9 @@ export class JudgmentSystem {
    * @param activeNotes 判定可能なノートのリスト
    * @returns 判定結果、該当ノートがない場合はnull
    */
-  judge(
-    currentTime: number,
-    lane: number,
-    activeNotes: ActiveNote[]
-  ): JudgmentResult | null {
+  judge(currentTime: number, lane: number, activeNotes: ActiveNote[]): JudgmentResult | null {
     // 該当レーンの未判定ノートを取得
-    const laneNotes = activeNotes.filter(
-      (note) => note.lane === lane && !note.judged
-    );
+    const laneNotes = activeNotes.filter((note) => note.lane === lane && !note.judged);
 
     if (laneNotes.length === 0) {
       return null;

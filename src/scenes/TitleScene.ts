@@ -17,23 +17,29 @@ export class TitleScene extends Phaser.Scene {
     this.add.rectangle(width / 2, height / 2, width, height, 0x0a0a1e);
 
     // タイトルロゴ
-    this.add.text(width / 2, height / 2 - 32, 'NORU', {
-      fontSize: '38px',
-      color: '#ffffff',
-      fontStyle: 'bold',
-    }).setOrigin(0.5);
+    this.add
+      .text(width / 2, height / 2 - 32, 'NORU', {
+        fontSize: '38px',
+        color: '#ffffff',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
 
     // サブタイトル
-    this.add.text(width / 2, height / 2 + 8, 'Rhythm Game', {
-      fontSize: '13px',
-      color: '#888888',
-    }).setOrigin(0.5);
+    this.add
+      .text(width / 2, height / 2 + 8, 'Rhythm Game', {
+        fontSize: '13px',
+        color: '#888888',
+      })
+      .setOrigin(0.5);
 
     // スタートプロンプト
-    const startText = this.add.text(width / 2, height / 2 + 48, 'Press ENTER or Click to Start', {
-      fontSize: '10px',
-      color: '#ffffff',
-    }).setOrigin(0.5);
+    const startText = this.add
+      .text(width / 2, height / 2 + 48, 'Press ENTER or Click to Start', {
+        fontSize: '10px',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5);
 
     // 点滅アニメーション
     this.tweens.add({
@@ -46,10 +52,12 @@ export class TitleScene extends Phaser.Scene {
     });
 
     // バージョン表示
-    this.add.text(width - 8, height - 8, 'v0.1.0', {
-      fontSize: '6px',
-      color: '#444444',
-    }).setOrigin(1, 1);
+    this.add
+      .text(width - 8, height - 8, 'v0.1.0', {
+        fontSize: '6px',
+        color: '#444444',
+      })
+      .setOrigin(1, 1);
 
     // 開始フラグ（重複防止）
     let started = false;

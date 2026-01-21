@@ -13,10 +13,6 @@ export class AudioSyncEngine {
   private isPlaying: boolean = false;
   private offset: number = 0; // オフセット調整（ミリ秒）
 
-  constructor() {
-    // AudioContextは最初のユーザー操作後に初期化する必要がある（ブラウザの自動再生ポリシー）
-  }
-
   /**
    * AudioContextを初期化
    * ユーザーの最初の操作（タップ、クリック）時に呼び出す
@@ -27,7 +23,7 @@ export class AudioSyncEngine {
     }
 
     this.audioContext = new AudioContext();
-    
+
     // iOS Safariなど、一部のブラウザではresumeが必要
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();

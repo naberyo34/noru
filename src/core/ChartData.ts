@@ -19,9 +19,9 @@ export enum JudgmentType {
  */
 export interface JudgmentWindow {
   perfect: number; // ±30ms
-  great: number;   // ±60ms
-  good: number;    // ±90ms
-  bad: number;     // ±120ms
+  great: number; // ±60ms
+  good: number; // ±90ms
+  bad: number; // ±120ms
 }
 
 /**
@@ -38,21 +38,21 @@ export const DEFAULT_JUDGMENT_WINDOW: JudgmentWindow = {
  * ノートデータ
  */
 export interface NoteData {
-  lane: number;     // レーン番号 (0-7)
-  timing: number;   // 出現タイミング（ミリ秒）
-  id?: string;      // ノート識別用ID（オプショナル）
+  lane: number; // レーン番号 (0-7)
+  timing: number; // 出現タイミング（ミリ秒）
+  id?: string; // ノート識別用ID（オプショナル）
 }
 
 /**
  * 譜面メタデータ
  */
 export interface ChartMetadata {
-  title: string;                    // 楽曲タイトル
-  artist: string;                   // アーティスト名
-  audioFile: string;                // .wavファイルパス
-  bpm: number;                      // BPM（初期実装は固定BPM）
-  timeSignature: [number, number];  // 拍子 [4, 4] 固定
-  offset: number;                   // 音楽とノートの同期オフセット(ms)
+  title: string; // 楽曲タイトル
+  artist: string; // アーティスト名
+  audioFile: string; // .wavファイルパス
+  bpm: number; // BPM（初期実装は固定BPM）
+  timeSignature: [number, number]; // 拍子 [4, 4] 固定
+  offset: number; // 音楽とノートの同期オフセット(ms)
 }
 
 /**
@@ -61,7 +61,7 @@ export interface ChartMetadata {
 export interface ChartData {
   metadata: ChartMetadata;
   notes: NoteData[];
-  
+
   // 将来の拡張用（未実装）
   bpmChanges?: Array<{ timing: number; bpm: number }>;
   activeLanes?: number[]; // 使用レーン指定（4〜8レーン可変）
@@ -71,8 +71,8 @@ export interface ChartData {
  * ゲームプレイ中のノート状態
  */
 export interface ActiveNote extends NoteData {
-  id: string;           // 必須のID
-  judged: boolean;      // 判定済みか
+  id: string; // 必須のID
+  judged: boolean; // 判定済みか
   judgmentType?: JudgmentType; // 判定結果
 }
 
@@ -97,18 +97,28 @@ export interface PlayResult {
  */
 export const LANE_COUNT = 8;
 export const LANE_KEYS = ['a', 's', 'd', 'f', 'k', 'l', ';', "'"] as const;
-export type LaneKey = typeof LANE_KEYS[number];
+export type LaneKey = (typeof LANE_KEYS)[number];
 
 // KeyboardEvent.key と KeyboardEvent.code のマッピング
 const KEY_TO_LANE_MAP: { [key: string]: number } = {
-  'a': 0, 'A': 0,
-  's': 1, 'S': 1,
-  'd': 2, 'D': 2,
-  'f': 3, 'F': 3,
-  'k': 4, 'K': 4,
-  'l': 5, 'L': 5,
-  ';': 6, ':': 6, 'Semicolon': 6,
-  "'": 7, '"': 7, 'Quote': 7,
+  a: 0,
+  A: 0,
+  s: 1,
+  S: 1,
+  d: 2,
+  D: 2,
+  f: 3,
+  F: 3,
+  k: 4,
+  K: 4,
+  l: 5,
+  L: 5,
+  ';': 6,
+  ':': 6,
+  Semicolon: 6,
+  "'": 7,
+  '"': 7,
+  Quote: 7,
 };
 
 /**

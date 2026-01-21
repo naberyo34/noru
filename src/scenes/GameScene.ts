@@ -5,26 +5,26 @@
  */
 
 import Phaser from 'phaser';
-import { AudioSyncEngine } from '../core/AudioSyncEngine';
-import { JudgmentSystem, JudgmentResult } from '../core/JudgmentSystem';
-import { ScoreCalculator } from '../core/ScoreCalculator';
 import {
-  ChartData,
-  ActiveNote,
-  LANE_COUNT,
-  LANE_KEYS,
-  getLaneFromKey,
-  JudgmentType,
-} from '../core/ChartData';
-import {
+  ANIMATION,
+  EFFECTS,
   GAMEPLAY,
   JUDGMENT_COLORS,
   JUDGMENT_COLORS_CSS,
   LANE_NOTE_COLORS,
-  EFFECTS,
   UI,
-  ANIMATION,
 } from '../config/GameConfig';
+import { AudioSyncEngine } from '../core/AudioSyncEngine';
+import {
+  type ActiveNote,
+  type ChartData,
+  getLaneFromKey,
+  JudgmentType,
+  LANE_COUNT,
+  LANE_KEYS,
+} from '../core/ChartData';
+import { type JudgmentResult, JudgmentSystem } from '../core/JudgmentSystem';
+import { ScoreCalculator } from '../core/ScoreCalculator';
 
 export class GameScene extends Phaser.Scene {
   private audioEngine: AudioSyncEngine | null = null;
@@ -38,7 +38,6 @@ export class GameScene extends Phaser.Scene {
   private scoreText!: Phaser.GameObjects.Text;
   private accuracyText!: Phaser.GameObjects.Text;
   private laneGraphics: Phaser.GameObjects.Rectangle[] = [];
-  private judgmentLine!: Phaser.GameObjects.Rectangle;
   private laneHighlights: Phaser.GameObjects.Rectangle[] = [];
 
   // ゲーム状態
@@ -56,7 +55,7 @@ export class GameScene extends Phaser.Scene {
   init(data: { chartFile?: string }) {
     // SongSelectSceneから渡されたチャートファイルのパス
     this.chartFile = data.chartFile || 'assets/charts/test-song-hard.json';
-    
+
     // ゲーム状態をリセット
     this.gameStarted = false;
     this.gameEnded = false;
@@ -83,10 +82,12 @@ export class GameScene extends Phaser.Scene {
     if (!this.chartData) {
       console.error('Failed to load chart data');
       const { width, height } = this.cameras.main;
-      this.add.text(width / 2, height / 2, 'Failed to load chart data', {
-        fontSize: '12px',
-        color: '#ff0000',
-      }).setOrigin(0.5);
+      this.add
+        .text(width / 2, height / 2, 'Failed to load chart data', {
+          fontSize: '12px',
+          color: '#ff0000',
+        })
+        .setOrigin(0.5);
       return;
     }
 
@@ -106,16 +107,20 @@ export class GameScene extends Phaser.Scene {
     const { width } = this.cameras.main;
 
     // タイトル表示
-    this.add.text(width / 2, UI.TITLE_Y, this.chartData.metadata.title, {
-      fontSize: UI.FONT_TITLE,
-      color: '#ffffff',
-      fontStyle: 'bold',
-    }).setOrigin(0.5);
+    this.add
+      .text(width / 2, UI.TITLE_Y, this.chartData.metadata.title, {
+        fontSize: UI.FONT_TITLE,
+        color: '#ffffff',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
 
-    this.add.text(width / 2, UI.ARTIST_Y, this.chartData.metadata.artist, {
-      fontSize: UI.FONT_ARTIST,
-      color: '#cccccc',
-    }).setOrigin(0.5);
+    this.add
+      .text(width / 2, UI.ARTIST_Y, this.chartData.metadata.artist, {
+        fontSize: UI.FONT_ARTIST,
+        color: '#cccccc',
+      })
+      .setOrigin(0.5);
 
     // スコア表示
     this.scoreText = this.add.text(UI.SCORE_X, UI.SCORE_Y, 'Score: 0', {
@@ -124,10 +129,12 @@ export class GameScene extends Phaser.Scene {
     });
 
     // 正確度表示
-    this.accuracyText = this.add.text(width - UI.ACCURACY_OFFSET, UI.SCORE_Y, 'Accuracy: 100.0%', {
-      fontSize: UI.FONT_SCORE,
-      color: '#ffffff',
-    }).setOrigin(1, 0);
+    this.accuracyText = this.add
+      .text(width - UI.ACCURACY_OFFSET, UI.SCORE_Y, 'Accuracy: 100.0%', {
+        fontSize: UI.FONT_SCORE,
+        color: '#ffffff',
+      })
+      .setOrigin(1, 0);
   }
 
   private setupLanes() {
@@ -137,30 +144,48 @@ export class GameScene extends Phaser.Scene {
     // レーン背景
     for (let i = 0; i < LANE_COUNT; i++) {
       const x = startX + i * GAMEPLAY.LANE_WIDTH + GAMEPLAY.LANE_WIDTH / 2;
-      
+
       // レーン背景
-      const lane = this.add.rectangle(x, GAMEPLAY.LANE_Y_CENTER, GAMEPLAY.LANE_WIDTH - 2, height, 0x333333, 0.5);
+      const lane = this.add.rectangle(
+        x,
+        GAMEPLAY.LANE_Y_CENTER,
+        GAMEPLAY.LANE_WIDTH - 2,
+        height,
+        0x333333,
+        0.5
+      );
       this.laneGraphics.push(lane);
 
       // レーンキー表示
-      this.add.text(x, height - UI.LANE_KEY_Y_OFFSET, LANE_KEYS[i].toUpperCase(), {
-        fontSize: UI.FONT_LANE_KEY,
-        color: '#ffffff',
-        fontStyle: 'bold',
-      }).setOrigin(0.5);
+      this.add
+        .text(x, height - UI.LANE_KEY_Y_OFFSET, LANE_KEYS[i].toUpperCase(), {
+          fontSize: UI.FONT_LANE_KEY,
+          color: '#ffffff',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5);
 
       // ハイライト（キー押下時用）
-      const highlight = this.add.rectangle(x, GAMEPLAY.LANE_Y_CENTER, GAMEPLAY.LANE_WIDTH - 2, height, 0xffffff, 0);
+      const highlight = this.add.rectangle(
+        x,
+        GAMEPLAY.LANE_Y_CENTER,
+        GAMEPLAY.LANE_WIDTH - 2,
+        height,
+        0xffffff,
+        0
+      );
       this.laneHighlights.push(highlight);
 
       // タッチ用ゾーン
-      const touchZone = this.add.zone(x, GAMEPLAY.LANE_Y_CENTER, GAMEPLAY.LANE_WIDTH, height).setInteractive();
+      const touchZone = this.add
+        .zone(x, GAMEPLAY.LANE_Y_CENTER, GAMEPLAY.LANE_WIDTH, height)
+        .setInteractive();
       touchZone.on('pointerdown', () => this.handleLaneInput(i));
       this.touchZones.push(touchZone);
     }
 
-    // 判定ライン
-    this.judgmentLine = this.add.rectangle(
+    // 判定ライン（視覚的ガイド）
+    this.add.rectangle(
       width / 2,
       GAMEPLAY.JUDGMENT_LINE_Y,
       LANE_COUNT * GAMEPLAY.LANE_WIDTH,
@@ -173,16 +198,20 @@ export class GameScene extends Phaser.Scene {
   private async initializeAndStart() {
     const { width, height } = this.cameras.main;
 
-    const loadingText = this.add.text(width / 2, height / 2, 'Loading...', {
-      fontSize: UI.FONT_TITLE,
-      color: '#ffffff',
-      fontStyle: 'bold',
-    }).setOrigin(0.5);
+    const loadingText = this.add
+      .text(width / 2, height / 2, 'Loading...', {
+        fontSize: UI.FONT_TITLE,
+        color: '#ffffff',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
 
-    const statusText = this.add.text(width / 2, height / 2 + 20, 'Initializing audio...', {
-      fontSize: UI.FONT_ARTIST,
-      color: '#888888',
-    }).setOrigin(0.5);
+    const statusText = this.add
+      .text(width / 2, height / 2 + 20, 'Initializing audio...', {
+        fontSize: UI.FONT_ARTIST,
+        color: '#888888',
+      })
+      .setOrigin(0.5);
 
     try {
       // AudioEngineの初期化
@@ -217,15 +246,18 @@ export class GameScene extends Phaser.Scene {
 
   private async showCountdown() {
     const { width, height } = this.cameras.main;
-    
+
     const countdownNumbers = ['3', '2', '1', 'START!'];
-    
+
     for (const num of countdownNumbers) {
-      const text = this.add.text(width / 2, height / 2, num, {
-        fontSize: num === 'START!' ? UI.FONT_COUNTDOWN_START : UI.FONT_COUNTDOWN,
-        color: '#ffffff',
-        fontStyle: 'bold',
-      }).setOrigin(0.5).setAlpha(0);
+      const text = this.add
+        .text(width / 2, height / 2, num, {
+          fontSize: num === 'START!' ? UI.FONT_COUNTDOWN_START : UI.FONT_COUNTDOWN,
+          color: '#ffffff',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+        .setAlpha(0);
 
       // フェードイン・アウト
       this.tweens.add({
@@ -236,7 +268,12 @@ export class GameScene extends Phaser.Scene {
         ease: 'Power2',
       });
 
-      await new Promise(resolve => setTimeout(resolve, num === 'START!' ? EFFECTS.COUNTDOWN_START_DURATION : EFFECTS.COUNTDOWN_DURATION));
+      await new Promise((resolve) =>
+        setTimeout(
+          resolve,
+          num === 'START!' ? EFFECTS.COUNTDOWN_START_DURATION : EFFECTS.COUNTDOWN_DURATION
+        )
+      );
 
       this.tweens.add({
         targets: text,
@@ -247,7 +284,7 @@ export class GameScene extends Phaser.Scene {
       });
 
       if (num !== 'START!') {
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise((resolve) => setTimeout(resolve, 200));
       }
     }
   }
@@ -283,6 +320,7 @@ export class GameScene extends Phaser.Scene {
     this.showLaneHighlight(lane);
 
     // 判定
+    if (!this.audioEngine) return;
     const currentTime = this.audioEngine.getCurrentTime();
     const result = this.judgmentSystem.judge(currentTime, lane, this.activeNotes);
 
@@ -294,7 +332,7 @@ export class GameScene extends Phaser.Scene {
   private showLaneHighlight(lane: number) {
     const highlight = this.laneHighlights[lane];
     highlight.setAlpha(0.3);
-    
+
     // フェードアウト
     this.tweens.add({
       targets: highlight,
@@ -320,7 +358,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // activeNotesから削除
-    const noteIndex = this.activeNotes.findIndex(n => n.id === result.note.id);
+    const noteIndex = this.activeNotes.findIndex((n) => n.id === result.note.id);
     if (noteIndex !== -1) {
       this.activeNotes.splice(noteIndex, 1);
     }
@@ -342,19 +380,21 @@ export class GameScene extends Phaser.Scene {
 
     // 現在のコンボ数を取得
     const combo = this.scoreCalculator.getCurrentCombo();
-    
+
     // 判定とコンボ数を一緒に表示（ビートマニア風）
-    let displayText = judgment;
+    let displayText: string = judgment;
     if (combo > 0 && judgment !== JudgmentType.MISS && judgment !== JudgmentType.BAD) {
       displayText = `${judgment} ${combo}`;
     }
 
     // 判定ごとに新しいテキストオブジェクトを生成（同時表示対応）
-    const judgmentText = this.add.text(width / 2, EFFECTS.JUDGMENT_TEXT_Y, displayText, {
-      fontSize: UI.FONT_JUDGMENT,
-      color: JUDGMENT_COLORS_CSS[judgment],
-      fontStyle: 'bold',
-    }).setOrigin(0.5);
+    const judgmentText = this.add
+      .text(width / 2, EFFECTS.JUDGMENT_TEXT_Y, displayText, {
+        fontSize: UI.FONT_JUDGMENT,
+        color: JUDGMENT_COLORS_CSS[judgment],
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
 
     // フェードアウト後に削除
     this.tweens.add({
@@ -382,9 +422,9 @@ export class GameScene extends Phaser.Scene {
 
     // 放射状のパーティクル
     for (let i = 0; i < EFFECTS.HIT_PARTICLE_COUNT; i++) {
-      const angle = (Math.PI * 2 / EFFECTS.HIT_PARTICLE_COUNT) * i + Math.PI / 4;
+      const angle = ((Math.PI * 2) / EFFECTS.HIT_PARTICLE_COUNT) * i + Math.PI / 4;
       const particle = this.add.rectangle(x, y, 4, 4, color, 1);
-      
+
       const targetX = x + Math.cos(angle) * EFFECTS.HIT_PARTICLE_DISTANCE;
       const targetY = y + Math.sin(angle) * EFFECTS.HIT_PARTICLE_DISTANCE;
 
@@ -426,8 +466,9 @@ export class GameScene extends Phaser.Scene {
     // 楽曲終了チェック
     const duration = this.audioEngine.getDuration();
     const isAudioEnded = !this.audioEngine.getIsPlaying() || currentTime >= duration;
-    const allNotesJudged = this.noteIndex >= this.chartData.notes.length && this.activeNotes.length === 0;
-    
+    const allNotesJudged =
+      this.noteIndex >= this.chartData.notes.length && this.activeNotes.length === 0;
+
     if (isAudioEnded && allNotesJudged) {
       this.endGame();
     }
@@ -466,9 +507,16 @@ export class GameScene extends Phaser.Scene {
 
     const color = LANE_NOTE_COLORS[note.lane];
 
-    const sprite = this.add.rectangle(x, GAMEPLAY.NOTE_SPAWN_Y, GAMEPLAY.NOTE_SIZE, GAMEPLAY.NOTE_SIZE, color, 1);
+    const sprite = this.add.rectangle(
+      x,
+      GAMEPLAY.NOTE_SPAWN_Y,
+      GAMEPLAY.NOTE_SIZE,
+      GAMEPLAY.NOTE_SIZE,
+      color,
+      1
+    );
     sprite.setStrokeStyle(1, 0xffffff);
-    
+
     this.noteSprites.set(note.id, sprite);
   }
 
@@ -486,7 +534,7 @@ export class GameScene extends Phaser.Scene {
       // ノートの位置を計算（音楽時刻に基づく）
       const timeUntilHit = note.timing - currentTime;
       const y = GAMEPLAY.JUDGMENT_LINE_Y - (timeUntilHit / 1000) * GAMEPLAY.NOTE_SPEED;
-      
+
       sprite.setY(y);
     }
   }
@@ -530,7 +578,7 @@ export class GameScene extends Phaser.Scene {
       this.audioEngine = null;
     }
     this.input.keyboard?.removeAllListeners();
-    
+
     // 配列をクリア
     this.activeNotes = [];
     this.noteSprites.clear();

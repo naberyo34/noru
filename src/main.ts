@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
-import { TitleScene } from './scenes/TitleScene';
-import { SongSelectScene } from './scenes/SongSelectScene';
+import { SCREEN } from './config/GameConfig';
 import { GameScene } from './scenes/GameScene';
 import { ResultScene } from './scenes/ResultScene';
-import { SCREEN } from './config/GameConfig';
+import { SongSelectScene } from './scenes/SongSelectScene';
+import { TitleScene } from './scenes/TitleScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
