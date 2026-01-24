@@ -40,19 +40,26 @@ export class GameScene extends Phaser.Scene {
   // ゲーム状態
   private gameStarted: boolean = false;
   private gameEnded: boolean = false;
+  private autoMode: boolean = false;
 
   constructor() {
     super({ key: 'GameScene' });
   }
 
-  init(data: { chartFile?: string }) {
+  init(data: { chartFile?: string; autoMode?: boolean }) {
     // SongSelectSceneから渡されたチャートファイルのパス
     this.chartFile = data.chartFile || 'assets/charts/test-song-hard.json';
+    this.autoMode = data.autoMode || false;
 
     // ゲーム状態をリセット
     this.gameStarted = false;
     this.gameEnded = false;
     this.audioEngine = null;
+
+    // 前回のチャートデータをキャッシュから削除（新しい曲を正しく読み込むため）
+    if (this.cache.json.exists('chart')) {
+      this.cache.json.remove('chart');
+    }
   }
 
   preload() {
@@ -106,6 +113,24 @@ export class GameScene extends Phaser.Scene {
 
     // 入力をセットアップ
     this.inputManager.setupKeyboard();
+    this.inputManager.setupHiSpeedKeys((delta) => this.changeHiSpeed(delta));
+    this.inputManager.setupEscKey(() => this.giveUp());
+    this.inputManager.setLaneInputEnabled(!this.autoMode);
+
+    // ハイスピード表示を初期化
+    this.uiManager.updateHiSpeed(this.noteManager.getHiSpeed());
+
+    // オートモード表示
+    if (this.autoMode) {
+      const { width } = this.cameras.main;
+      this.add
+        .text(width / 2, UI.AUTO_LABEL_Y, 'AUTO', {
+          fontSize: UI.AUTO_LABEL_FONT,
+          color: UI.AUTO_LABEL_COLOR,
+          fontStyle: UI.AUTO_LABEL_FONT_STYLE,
+        })
+        .setOrigin(0.5, 0);
+    }
 
     // 自動的にゲーム開始
     this.initializeAndStart();
@@ -188,11 +213,18 @@ export class GameScene extends Phaser.Scene {
     // 新しいノートを生成
     this.noteManager.spawnNotes(currentTime);
 
+    // オートモード：自動で全ノートをパーフェクト判定
+    if (this.autoMode) {
+      this.processAutoPlay(currentTime);
+    }
+
     // Miss判定チェック（ノート削除前に実行）
     this.checkMissedNotes(currentTime);
 
-    // ロングノート：途中で離したかチェック
-    this.checkLongNoteHolding();
+    // ロングノート：途中で離したかチェック（オートモードではスキップ）
+    if (!this.autoMode) {
+      this.checkLongNoteHolding();
+    }
 
     // 完了したノートを削除（判定処理後に実行）
     this.noteManager.removeFinishedNotes(currentTime);
@@ -354,6 +386,57 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * オートモード：自動で全ノートをパーフェクト判定
+   */
+  private processAutoPlay(currentTime: number) {
+    for (const note of this.noteManager.getActiveNotes()) {
+      // ロングノートの開始判定
+      if (isLongNote(note) && !isLongNoteStartJudged(note) && currentTime >= note.timing) {
+        const result = this.judgmentSystem.judgeStart(note.timing, note.lane, [note]);
+        if (result) {
+          // ロングノートは終了までハイライトを維持
+          this.uiManager.highlightLane(note.lane);
+          this.handleJudgment(result);
+        }
+      }
+      // 通常ノートの判定
+      else if (!isLongNote(note) && !note.judged && currentTime >= note.timing) {
+        const result = this.judgmentSystem.judge(note.timing, note.lane, [note]);
+        if (result) {
+          this.showAutoPlayHighlight(note.lane);
+          this.handleJudgment(result);
+        }
+      }
+
+      // ロングノートの終了判定
+      if (
+        isLongNote(note) &&
+        isLongNoteStartJudged(note) &&
+        !isLongNoteEndJudged(note) &&
+        note.endTiming !== undefined &&
+        currentTime >= note.endTiming
+      ) {
+        const result = this.judgmentSystem.judgeEnd(note.endTiming, note.lane, [note]);
+        if (result) {
+          this.uiManager.unhighlightLane(note.lane);
+          this.handleJudgment(result);
+        }
+      }
+    }
+  }
+
+  /**
+   * オートモード用：レーンハイライトを一瞬表示
+   */
+  private showAutoPlayHighlight(lane: number) {
+    this.uiManager.highlightLane(lane);
+    // 通常ノート用の一瞬ハイライト
+    this.time.delayedCall(EFFECTS.AUTO_HIGHLIGHT_DURATION, () => {
+      this.uiManager.unhighlightLane(lane);
+    });
+  }
+
   private checkMissedNotes(currentTime: number) {
     const missedNotes: ActiveNote[] = [];
 
@@ -390,6 +473,40 @@ export class GameScene extends Phaser.Scene {
     this.uiManager.updateAccuracy(accuracy);
   }
 
+  /**
+   * ハイスピードを変更
+   */
+  private changeHiSpeed(delta: number) {
+    const currentSpeed = this.noteManager.getHiSpeed();
+    const newSpeed = Math.round((currentSpeed + delta) * 10) / 10; // 小数点の丸め誤差対策
+
+    // NoteManagerに反映（クランプはNoteManager内で行われる）
+    this.noteManager.setHiSpeed(newSpeed);
+
+    // UI更新
+    this.uiManager.updateHiSpeed(this.noteManager.getHiSpeed());
+  }
+
+  /**
+   * ギブアップして楽曲選択画面に戻る
+   */
+  private giveUp() {
+    // 既にゲーム終了処理中なら無視
+    if (this.gameEnded) return;
+    this.gameEnded = true;
+
+    // 音楽停止
+    if (this.audioEngine) {
+      this.audioEngine.stop();
+    }
+
+    // フェードアウトして楽曲選択画面へ
+    this.cameras.main.fadeOut(ANIMATION.FADE_OUT_DURATION, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.start('SongSelectScene');
+    });
+  }
+
   private endGame() {
     if (this.gameEnded) return;
     this.gameEnded = true;
@@ -399,13 +516,18 @@ export class GameScene extends Phaser.Scene {
       this.audioEngine.stop();
     }
 
-    // フェードアウトしてリザルト画面へ
+    // フェードアウト
     this.cameras.main.fadeOut(ANIMATION.FADE_OUT_DURATION, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.scene.start('ResultScene', {
-        result: this.scoreCalculator.getResult(),
-        chartMetadata: this.chartData.metadata,
-      });
+      // オートモードはリザルトをスキップして楽曲選択に戻る
+      if (this.autoMode) {
+        this.scene.start('SongSelectScene');
+      } else {
+        this.scene.start('ResultScene', {
+          result: this.scoreCalculator.getResult(),
+          chartMetadata: this.chartData.metadata,
+        });
+      }
     });
   }
 
@@ -431,5 +553,6 @@ export class GameScene extends Phaser.Scene {
     if (this.uiManager) {
       this.uiManager.cleanup();
     }
+
   }
 }

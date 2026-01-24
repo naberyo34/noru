@@ -11,6 +11,7 @@ export class UIManager {
   private scene: Phaser.Scene;
   private scoreText!: Phaser.GameObjects.Text;
   private accuracyText!: Phaser.GameObjects.Text;
+  private hiSpeedText!: Phaser.GameObjects.Text;
   private laneGraphics: Phaser.GameObjects.Rectangle[] = [];
   private laneHighlights: Phaser.GameObjects.Rectangle[] = [];
   private touchZones: Phaser.GameObjects.Zone[] = [];
@@ -37,7 +38,7 @@ export class UIManager {
       UI.SCORE_Y + UI.ACCURACY_OFFSET,
       'Accuracy: 100.00%',
       {
-      fontSize: UI.FONT_ACCURACY,
+        fontSize: UI.FONT_ACCURACY,
         color: UI.TEXT_PRIMARY,
       }
     );
@@ -52,6 +53,13 @@ export class UIManager {
         })
         .setOrigin(0.5, 0);
     }
+
+    // ハイスピード表示（右上）
+    this.hiSpeedText = this.scene.add.text(width - UI.HI_SPEED_X_OFFSET, UI.SCORE_Y, 'x1.0', {
+      fontSize: UI.FONT_SCORE,
+      color: UI.HI_SPEED_COLOR,
+    });
+    this.hiSpeedText.setOrigin(1, 0); // 右揃え
   }
 
   /**
@@ -129,6 +137,13 @@ export class UIManager {
    */
   updateAccuracy(accuracy: number): void {
     this.accuracyText.setText(`Accuracy: ${accuracy.toFixed(2)}%`);
+  }
+
+  /**
+   * ハイスピード表示を更新
+   */
+  updateHiSpeed(hiSpeed: number): void {
+    this.hiSpeedText.setText(`x${hiSpeed.toFixed(1)}`);
   }
 
   /**

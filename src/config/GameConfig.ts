@@ -90,6 +90,7 @@ export const EFFECTS = {
   // レーンハイライト（キー押下時のフィードバック）
   LANE_HIGHLIGHT_COLOR: 0xffffff, // 白色
   LANE_HIGHLIGHT_ALPHA: 0.2, // 薄く
+  AUTO_HIGHLIGHT_DURATION: 100,
 
   // ロングノート長押しエフェクト
   LONG_NOTE_HOLD_RADIUS: 15,
@@ -117,6 +118,12 @@ export const UI = {
   FONT_LOADING: '20px',
   FONT_ERROR: '16px',
   TEXT_PRIMARY: '#ffffff',
+  HI_SPEED_X_OFFSET: 10,
+  HI_SPEED_COLOR: '#888888',
+  AUTO_LABEL_Y: 8,
+  AUTO_LABEL_FONT: '10px',
+  AUTO_LABEL_COLOR: '#ffff00',
+  AUTO_LABEL_FONT_STYLE: 'bold',
 
   // 配置
   SCORE_X: 10,
@@ -126,6 +133,16 @@ export const UI = {
   ARTIST_Y: 22,
   SONG_INFO_Y: 10,
   LANE_KEY_Y_OFFSET: 28,
+} as const;
+
+/**
+ * ハイスピード設定
+ */
+export const HI_SPEED = {
+  DEFAULT: 1.0,
+  MIN: 0.1,
+  MAX: 2.0,
+  STEP: 0.1,
 } as const;
 
 /**

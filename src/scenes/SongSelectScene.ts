@@ -72,7 +72,7 @@ export class SongSelectScene extends Phaser.Scene {
       .text(
         width / 2,
         height - SONG_SELECT_UI.HINT2_OFFSET_Y,
-        'ENTER / SPACE / Click : Start Game',
+        'ENTER / SPACE / Click : Start  |  A : Auto Play',
         {
           fontSize: SONG_SELECT_UI.HINT2_FONT,
           color: SONG_SELECT_UI.HINT2_COLOR,
@@ -94,7 +94,7 @@ export class SongSelectScene extends Phaser.Scene {
 
     // クリック/タップで開始
     this.input.on('pointerdown', () => {
-      this.startGame();
+      this.startGame(false);
     });
   }
 
@@ -184,7 +184,10 @@ export class SongSelectScene extends Phaser.Scene {
         break;
       case 'enter':
       case ' ':
-        this.startGame();
+        this.startGame(false);
+        break;
+      case 'a':
+        this.startGame(true);
         break;
       case 'escape':
         this.backToTitle();
@@ -214,7 +217,7 @@ export class SongSelectScene extends Phaser.Scene {
     this.scene.restart();
   }
 
-  private startGame() {
+  private startGame(autoMode: boolean) {
     const song = this.songs[this.selectedSongIndex];
     const difficulty = song.difficulties[this.selectedDifficultyIndex];
 
@@ -223,6 +226,7 @@ export class SongSelectScene extends Phaser.Scene {
     this.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.start('GameScene', {
         chartFile: difficulty.chartFile,
+        autoMode,
       });
     });
   }

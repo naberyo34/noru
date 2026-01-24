@@ -4,7 +4,7 @@
  */
 
 import type Phaser from 'phaser';
-import { GAMEPLAY, LANE_NOTE_COLORS } from '../config/GameConfig';
+import { GAMEPLAY, HI_SPEED, LANE_NOTE_COLORS } from '../config/GameConfig';
 import {
   type ActiveNote,
   type ChartData,
@@ -23,11 +23,41 @@ export class NoteManager {
   private noteSprites: Map<string, Phaser.GameObjects.Rectangle> = new Map();
   private noteIndex: number = 0;
   private lanePositions: number[];
+  private hiSpeed: number;
 
   constructor(scene: Phaser.Scene, chartData: ChartData, lanePositions: number[]) {
     this.scene = scene;
     this.chartData = chartData;
     this.lanePositions = lanePositions;
+    this.hiSpeed = HI_SPEED.DEFAULT;
+  }
+
+  /**
+   * ハイスピード倍率を設定
+   */
+  setHiSpeed(value: number): void {
+    this.hiSpeed = Math.max(HI_SPEED.MIN, Math.min(HI_SPEED.MAX, value));
+  }
+
+  /**
+   * 現在のハイスピード倍率を取得
+   */
+  getHiSpeed(): number {
+    return this.hiSpeed;
+  }
+
+  /**
+   * 現在のノート速度を取得（ピクセル/秒）
+   */
+  private getNoteSpeed(): number {
+    return GAMEPLAY.NOTE_SPEED * this.hiSpeed;
+  }
+
+  /**
+   * ノートが判定ラインに到達するまでの時間を取得（ミリ秒）
+   */
+  private getNoteTravelTime(): number {
+    return ((GAMEPLAY.JUDGMENT_LINE_Y - GAMEPLAY.NOTE_SPAWN_Y) / this.getNoteSpeed()) * 1000;
   }
 
   /**
@@ -35,12 +65,13 @@ export class NoteManager {
    */
   spawnNotes(currentTime: number): void {
     // ノートが判定ラインに到達する時間分だけ前に生成する
+    const travelTime = this.getNoteTravelTime();
     while (this.noteIndex < this.chartData.notes.length) {
       const note = this.chartData.notes[this.noteIndex];
       const timeUntilNote = note.timing - currentTime;
 
       // ノートの落下時間より前になったら生成
-      if (timeUntilNote <= GAMEPLAY.NOTE_TRAVEL_TIME) {
+      if (timeUntilNote <= travelTime) {
         if (note.lane < 0 || note.lane >= LANE_COUNT || !this.lanePositions[note.lane]) {
           console.warn(`Invalid lane index: ${note.lane}`, note);
           this.noteIndex++;
@@ -104,6 +135,8 @@ export class NoteManager {
    * ノートの位置を更新
    */
   updateNotes(currentTime: number): void {
+    const noteSpeed = this.getNoteSpeed();
+
     for (const note of this.activeNotes) {
       const sprite = this.noteSprites.get(note.id);
       if (!sprite) {
@@ -115,8 +148,8 @@ export class NoteManager {
         const timeUntilStart = note.timing - currentTime;
         const timeUntilEnd = note.endTiming - currentTime;
 
-        const startY = GAMEPLAY.JUDGMENT_LINE_Y - (timeUntilStart / 1000) * GAMEPLAY.NOTE_SPEED;
-        const endY = GAMEPLAY.JUDGMENT_LINE_Y - (timeUntilEnd / 1000) * GAMEPLAY.NOTE_SPEED;
+        const startY = GAMEPLAY.JUDGMENT_LINE_Y - (timeUntilStart / 1000) * noteSpeed;
+        const endY = GAMEPLAY.JUDGMENT_LINE_Y - (timeUntilEnd / 1000) * noteSpeed;
 
         // 開始判定済みで押している場合は、判定ラインから伸びる表現
         if (isLongNoteHolding(note) && !note.judged) {
@@ -139,7 +172,7 @@ export class NoteManager {
       } else {
         // 通常ノートの位置を計算（音楽時刻に基づく）
         const timeUntilHit = note.timing - currentTime;
-        const y = GAMEPLAY.JUDGMENT_LINE_Y - (timeUntilHit / 1000) * GAMEPLAY.NOTE_SPEED;
+        const y = GAMEPLAY.JUDGMENT_LINE_Y - (timeUntilHit / 1000) * noteSpeed;
         sprite.setY(y);
       }
     }
