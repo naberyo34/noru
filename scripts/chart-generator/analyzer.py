@@ -42,6 +42,9 @@ ONSET_DETECTION_PARAMS = {
     'units': 'time',        # 結果を秒単位で返す
 }
 
+# RMS計算のパラメータ（調整ポイント）
+RMS_FRAME_LENGTH = 2048
+
 # バンドパスフィルタの次数
 FILTER_ORDER = 4
 
@@ -67,10 +70,19 @@ class BPMResult(NamedTuple):
     tempo: float
 
 
+@dataclass(frozen=True)
+class OnsetFeature:
+    """オンセットの特徴量"""
+    time_sec: float
+    strength: float
+    rms: float
+
+
 class AnalysisResult(NamedTuple):
     """音声分析の全結果"""
     bpm: BPMResult
-    onsets_by_band: dict[str, NDArray[np.floating]]
+    onsets_by_band: dict[str, list[OnsetFeature]]
+    beat_start_ms: Optional[int]
     duration_sec: float
 
 
@@ -97,7 +109,7 @@ def load_audio(file_path: str, target_sr: Optional[int] = None) -> AudioData:
 # BPM検出
 # =============================================================================
 
-def detect_bpm(audio: AudioData) -> BPMResult:
+def detect_bpm(audio: AudioData) -> tuple[BPMResult, Optional[int]]:
     """
     BPMとビート位置を検出する。
 
@@ -105,14 +117,15 @@ def detect_bpm(audio: AudioData) -> BPMResult:
         audio: 音声データ
 
     Returns:
-        BPMResult: 検出されたBPMとビート位置
+        BPMResult: 検出されたBPM
+        最初のビート時刻（ミリ秒）、検出できない場合はNone
     """
     tempo_min = BPM_DETECTION_PARAMS['tempo_min']
     tempo_max = BPM_DETECTION_PARAMS['tempo_max']
     start_bpm = (tempo_min + tempo_max) / 2  # 範囲の中央値を初期値に
 
     # BPM検出
-    tempo, _ = librosa.beat.beat_track(
+    tempo, beat_frames = librosa.beat.beat_track(
         y=audio.waveform,
         sr=audio.sample_rate,
         start_bpm=start_bpm,
@@ -125,7 +138,12 @@ def detect_bpm(audio: AudioData) -> BPMResult:
     while tempo_value > tempo_max and tempo_value / 2 >= tempo_min:
         tempo_value /= 2
 
-    return BPMResult(tempo=tempo_value)
+    beat_times = librosa.frames_to_time(beat_frames, sr=audio.sample_rate)
+    beat_start_ms = None
+    if len(beat_times) > 0:
+        beat_start_ms = int(round(float(beat_times[0]) * 1000))
+
+    return BPMResult(tempo=tempo_value), beat_start_ms
 
 
 # =============================================================================
@@ -190,7 +208,57 @@ def detect_onsets(
     return np.array(onset_frames)
 
 
-def detect_onsets_by_band(audio: AudioData) -> dict[str, NDArray[np.floating]]:
+def extract_onset_features(
+    onset_strength: NDArray[np.floating],
+    rms: NDArray[np.floating],
+    sample_rate: int,
+    onset_times: NDArray[np.floating],
+) -> list[OnsetFeature]:
+    """
+    オンセット時刻に対する強度・RMSを抽出する。
+
+    Args:
+        onset_strength: 全帯域のオンセット強度
+        rms: 全帯域のRMS
+        sample_rate: サンプルレート
+        onset_times: オンセット時刻（秒単位）
+
+    Returns:
+        オンセット特徴量のリスト
+    """
+    if onset_times.size == 0:
+        return []
+
+    hop_length = ONSET_DETECTION_PARAMS['hop_length']
+    onset_frames = librosa.time_to_frames(
+        onset_times,
+        sr=sample_rate,
+        hop_length=hop_length,
+    )
+
+    max_strength_idx = len(onset_strength) - 1
+    max_rms_idx = len(rms) - 1
+
+    features: list[OnsetFeature] = []
+    for time_sec, frame_idx in zip(onset_times, onset_frames):
+        strength_idx = int(min(max(frame_idx, 0), max_strength_idx))
+        rms_idx = int(min(max(frame_idx, 0), max_rms_idx))
+        features.append(
+            OnsetFeature(
+                time_sec=float(time_sec),
+                strength=float(onset_strength[strength_idx]),
+                rms=float(rms[rms_idx]),
+            ),
+        )
+
+    return features
+
+
+def detect_onsets_by_band(
+    audio: AudioData,
+    onset_strength: NDArray[np.floating],
+    rms: NDArray[np.floating],
+) -> dict[str, list[OnsetFeature]]:
     """
     周波数帯域別にオンセットを検出する。
 
@@ -198,9 +266,9 @@ def detect_onsets_by_band(audio: AudioData) -> dict[str, NDArray[np.floating]]:
         audio: 音声データ
 
     Returns:
-        帯域名をキー、オンセット位置配列を値とする辞書
+        帯域名をキー、オンセット特徴量リストを値とする辞書
     """
-    results: dict[str, NDArray[np.floating]] = {}
+    results: dict[str, list[OnsetFeature]] = {}
 
     for band in FREQUENCY_BANDS:
         # バンドパスフィルタを適用
@@ -212,9 +280,40 @@ def detect_onsets_by_band(audio: AudioData) -> dict[str, NDArray[np.floating]]:
         )
         # オンセット検出
         onsets = detect_onsets(filtered, audio.sample_rate)
-        results[band.name] = onsets
+        results[band.name] = extract_onset_features(
+            onset_strength,
+            rms,
+            audio.sample_rate,
+            onsets,
+        )
 
     return results
+
+
+def compute_onset_strength_and_rms(
+    audio: AudioData,
+) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
+    """
+    全帯域のオンセット強度とRMSを計算する。
+
+    Args:
+        audio: 音声データ
+
+    Returns:
+        オンセット強度配列とRMS配列
+    """
+    hop_length = ONSET_DETECTION_PARAMS['hop_length']
+    onset_strength = librosa.onset.onset_strength(
+        y=audio.waveform,
+        sr=audio.sample_rate,
+        hop_length=hop_length,
+    )
+    rms = librosa.feature.rms(
+        y=audio.waveform,
+        frame_length=RMS_FRAME_LENGTH,
+        hop_length=hop_length,
+    )[0]
+    return onset_strength, rms
 
 
 # =============================================================================
@@ -235,10 +334,13 @@ def analyze_audio(file_path: str) -> AnalysisResult:
     audio = load_audio(file_path)
 
     # BPM検出
-    bpm_result = detect_bpm(audio)
+    bpm_result, beat_start_ms = detect_bpm(audio)
+
+    # 全帯域の強度・音量を計算
+    onset_strength, rms = compute_onset_strength_and_rms(audio)
 
     # 周波数帯域別オンセット検出
-    onsets_by_band = detect_onsets_by_band(audio)
+    onsets_by_band = detect_onsets_by_band(audio, onset_strength, rms)
 
     # 楽曲の長さ（秒）
     duration_sec = len(audio.waveform) / audio.sample_rate
@@ -246,5 +348,6 @@ def analyze_audio(file_path: str) -> AnalysisResult:
     return AnalysisResult(
         bpm=bpm_result,
         onsets_by_band=onsets_by_band,
+        beat_start_ms=beat_start_ms,
         duration_sec=duration_sec,
     )

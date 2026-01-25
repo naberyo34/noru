@@ -4,14 +4,26 @@
  * View非依存のコアロジック
  */
 
+type AudioContextFactory = () => AudioContext;
+type FetchFunction = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+
 export class AudioSyncEngine {
+  private readonly audioContextFactory: AudioContextFactory;
+  private readonly fetchFn: FetchFunction;
   private audioContext: AudioContext | null = null;
   private audioBuffer: AudioBuffer | null = null;
   private sourceNode: AudioBufferSourceNode | null = null;
-  private startTime: number = 0;
-  private pausedAt: number = 0;
   private isPlaying: boolean = false;
   private offset: number = 0; // オフセット調整（ミリ秒）
+
+  // リードイン機能（曲開始前の準備時間）
+  private leadInTime: number = 0; // リードイン時間（ミリ秒）
+  private gameStartTime: number = 0; // ゲーム開始時のタイムスタンプ（リードイン開始時点）
+
+  constructor(deps?: { audioContextFactory?: AudioContextFactory; fetchFn?: FetchFunction }) {
+    this.audioContextFactory = deps?.audioContextFactory ?? (() => new AudioContext());
+    this.fetchFn = deps?.fetchFn ?? fetch;
+  }
 
   /**
    * AudioContextを初期化
@@ -22,7 +34,7 @@ export class AudioSyncEngine {
       return;
     }
 
-    this.audioContext = new AudioContext();
+    this.audioContext = this.audioContextFactory();
 
     // iOS Safariなど、一部のブラウザではresumeが必要
     if (this.audioContext.state === 'suspended') {
@@ -40,13 +52,21 @@ export class AudioSyncEngine {
     }
 
     try {
-      const response = await fetch(url);
+      const response = await this.fetchFn(url);
       const arrayBuffer = await response.arrayBuffer();
       this.audioBuffer = await this.audioContext!.decodeAudioData(arrayBuffer);
     } catch (error) {
       console.error('Failed to load audio:', error);
       throw error;
     }
+  }
+
+  /**
+   * リードイン時間を設定（ミリ秒）
+   * 音楽再生前に準備時間を設ける（ノートが画面上部から落ちてくる時間を確保）
+   */
+  setLeadInTime(leadInMs: number): void {
+    this.leadInTime = Math.max(0, leadInMs);
   }
 
   /**
@@ -65,37 +85,29 @@ export class AudioSyncEngine {
       this.sourceNode.disconnect();
     }
 
-    // 新しいSourceNodeを作成（SourceNodeは使い捨て）
+    // ゲーム開始時刻を記録（リードインがある場合はここから時間計測開始）
+    this.gameStartTime = this.audioContext.currentTime;
+    this.isPlaying = true;
+
+    // 新しいSourceNodeを作成
     this.sourceNode = this.audioContext.createBufferSource();
     this.sourceNode.buffer = this.audioBuffer;
     this.sourceNode.connect(this.audioContext.destination);
 
-    // 再生開始
-    const startOffset = this.pausedAt + offset;
-    this.sourceNode.start(0, startOffset);
-    this.startTime = this.audioContext.currentTime - startOffset;
-    this.isPlaying = true;
-    this.pausedAt = 0;
+    if (this.leadInTime > 0) {
+      // リードインあり：指定時間後に音楽再生を開始
+      const leadInSeconds = this.leadInTime / 1000;
+      const audioStartAt = this.gameStartTime + leadInSeconds;
+      this.sourceNode.start(audioStartAt, offset);
+    } else {
+      // リードインなし：即座に再生
+      this.sourceNode.start(0, offset);
+    }
 
     // 楽曲終了時のハンドリング
     this.sourceNode.onended = () => {
       this.isPlaying = false;
     };
-  }
-
-  /**
-   * 音楽を一時停止
-   */
-  pause(): void {
-    if (!this.isPlaying || !this.sourceNode || !this.audioContext) {
-      return;
-    }
-
-    this.pausedAt = this.audioContext.currentTime - this.startTime;
-    this.sourceNode.stop();
-    this.sourceNode.disconnect();
-    this.sourceNode = null;
-    this.isPlaying = false;
   }
 
   /**
@@ -108,25 +120,24 @@ export class AudioSyncEngine {
       this.sourceNode = null;
     }
     this.isPlaying = false;
-    this.startTime = 0;
-    this.pausedAt = 0;
+    this.gameStartTime = 0;
   }
 
   /**
    * 現在の再生時刻を取得（ミリ秒）
    * オフセット調整を含む
+   * リードイン中は負の値を返す（-leadInTime から 0 に向かって増加）
    */
   getCurrentTime(): number {
-    if (!this.audioContext) {
+    if (!this.audioContext || !this.isPlaying) {
       return 0;
     }
 
-    if (!this.isPlaying) {
-      return this.pausedAt * 1000 + this.offset;
-    }
-
-    const currentTime = this.audioContext.currentTime - this.startTime;
-    return currentTime * 1000 + this.offset;
+    // 統一された時間計算：
+    // ゲーム開始からの経過時間 - リードイン時間 = 音楽時刻
+    // リードイン中は負の値、リードイン後は音楽の再生位置と一致
+    const elapsedSinceGameStart = (this.audioContext.currentTime - this.gameStartTime) * 1000;
+    return elapsedSinceGameStart - this.leadInTime + this.offset;
   }
 
   /**
@@ -155,20 +166,6 @@ export class AudioSyncEngine {
   }
 
   /**
-   * オフセット調整値を取得（ミリ秒）
-   */
-  getOffset(): number {
-    return this.offset;
-  }
-
-  /**
-   * AudioContextの状態を取得
-   */
-  getAudioContextState(): AudioContextState | null {
-    return this.audioContext?.state ?? null;
-  }
-
-  /**
    * リソースを解放
    */
   dispose(): void {
@@ -178,5 +175,6 @@ export class AudioSyncEngine {
       this.audioContext = null;
     }
     this.audioBuffer = null;
+    this.leadInTime = 0;
   }
 }

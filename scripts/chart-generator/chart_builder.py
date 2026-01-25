@@ -10,12 +10,13 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from enum import Enum
+from statistics import median
 from typing import Any, Optional
 
 import numpy as np
 from numpy.typing import NDArray
 
-from analyzer import AnalysisResult
+from analyzer import AnalysisResult, OnsetFeature
 
 
 # =============================================================================
@@ -36,6 +37,9 @@ LANE_MAPPINGS: tuple[LaneMapping, ...] = (
     LaneMapping(band_name='high', lanes=(6, 7)),          # 高音域 → レーン6-7
 )
 
+# クォンタイズ設定（グリッド基準）
+QUANTIZE_DIVISION = 16  # 1/16グリッドに吸着
+
 
 class Difficulty(Enum):
     """難易度設定"""
@@ -48,18 +52,44 @@ class Difficulty(Enum):
 class DifficultyParams:
     """難易度別のパラメータ（音符単位）"""
     note_division: int  # 音符の分割数（4=4分音符、8=8分音符、16=16分音符）
+    chord_window_ms: int  # 同時押しとみなす時間幅
+    max_chord_notes: int  # 同時押しの最大数
+    chord_strength_percentile: int  # 強度の閾値（パーセンタイル）
+    chord_rms_percentile: int  # RMSの閾値（パーセンタイル）
+    chord_local_window_ms: int  # 強度・音量を評価する時間窓
 
 
 # 難易度別パラメータ（調整ポイント）
 # BPMから間隔を計算: 60000 / BPM / (note_division / 4) ms
 DIFFICULTY_SETTINGS: dict[Difficulty, DifficultyParams] = {
-    Difficulty.EASY: DifficultyParams(note_division=4),    # 4分音符間隔
-    Difficulty.NORMAL: DifficultyParams(note_division=8),  # 8分音符間隔
-    Difficulty.HARD: DifficultyParams(note_division=16),   # 16分音符間隔
+    Difficulty.EASY: DifficultyParams(
+        note_division=4,
+        chord_window_ms=30,
+        max_chord_notes=2,
+        chord_strength_percentile=90,
+        chord_rms_percentile=90,
+        chord_local_window_ms=4000,
+    ),  # 4分音符間隔
+    Difficulty.NORMAL: DifficultyParams(
+        note_division=8,
+        chord_window_ms=35,
+        max_chord_notes=2,
+        chord_strength_percentile=85,
+        chord_rms_percentile=85,
+        chord_local_window_ms=3000,
+    ),  # 8分音符間隔
+    Difficulty.HARD: DifficultyParams(
+        note_division=16,
+        chord_window_ms=40,
+        max_chord_notes=3,
+        chord_strength_percentile=80,
+        chord_rms_percentile=80,
+        chord_local_window_ms=2500,
+    ),  # 16分音符間隔
 }
 
 
-def calc_min_interval_ms(bpm: float, note_division: int) -> int:
+def calc_min_interval_ms(bpm: float, note_division: int) -> float:
     """
     BPMと音符分割数から最小間隔（ミリ秒）を計算する。
 
@@ -74,7 +104,7 @@ def calc_min_interval_ms(bpm: float, note_division: int) -> int:
     # 8分音符 = 4分音符 / 2
     # 16分音符 = 4分音符 / 4
     quarter_note_ms = 60000 / bpm
-    return int(quarter_note_ms / (note_division / 4))
+    return quarter_note_ms / (note_division / 4)
 
 
 # =============================================================================
@@ -86,6 +116,9 @@ class NoteData:
     """ノートデータ"""
     lane: int
     timing: int  # ミリ秒
+    band_name: Optional[str] = None
+    strength: float = 0.0
+    rms: float = 0.0
 
 
 @dataclass
@@ -145,7 +178,7 @@ def _seconds_to_ms(seconds: float) -> int:
 
 
 def generate_notes_from_onsets(
-    onsets_by_band: dict[str, NDArray[np.floating]],
+    onsets_by_band: dict[str, list[OnsetFeature]],
 ) -> list[NoteData]:
     """
     オンセット情報からノートを生成する。
@@ -153,7 +186,7 @@ def generate_notes_from_onsets(
     同じ帯域内での連続ノートは、交互にレーンを切り替えて配置。
 
     Args:
-        onsets_by_band: 帯域名→オンセット位置配列の辞書
+        onsets_by_band: 帯域名→オンセット特徴量の辞書
 
     Returns:
         生成されたノートのリスト（時間順でソートされていない）
@@ -167,73 +200,238 @@ def generate_notes_from_onsets(
 
         # 交互にレーンを切り替える
         lane_index = 0
-        for onset_time in onset_times:
-            timing_ms = _seconds_to_ms(float(onset_time))
+        for onset in onset_times:
+            timing_ms = _seconds_to_ms(onset.time_sec)
             lane = lanes[lane_index % len(lanes)]
-            notes.append(NoteData(lane=lane, timing=timing_ms))
+            notes.append(
+                NoteData(
+                    lane=lane,
+                    timing=timing_ms,
+                    band_name=band_name,
+                    strength=onset.strength,
+                    rms=onset.rms,
+                ),
+            )
             lane_index += 1
 
     return notes
+
+
+def quantize_notes_to_grid(
+    notes: list[NoteData],
+    bpm: float,
+    beat_start_ms: Optional[int],
+    division: int,
+) -> list[NoteData]:
+    """
+    最初のビート時刻以降のノートをグリッドへ吸着する。
+
+    Args:
+        notes: 入力ノートリスト
+        bpm: BPM
+        beat_start_ms: 最初のビート時刻（ミリ秒）
+        division: 分割数（16=16分音符グリッド）
+
+    Returns:
+        クォンタイズ済みのノートリスト
+    """
+    if not notes or beat_start_ms is None:
+        return notes
+
+    grid_ms = calc_min_interval_ms(bpm, division)
+    if grid_ms <= 0:
+        return notes
+
+    quantized: list[NoteData] = []
+
+    for note in notes:
+        if note.timing < beat_start_ms:
+            quantized.append(note)
+            continue
+
+        offset_ms = note.timing - beat_start_ms
+        snapped = beat_start_ms + round(offset_ms / grid_ms) * grid_ms
+
+        quantized.append(
+            NoteData(
+                lane=note.lane,
+                timing=int(round(snapped)),
+                band_name=note.band_name,
+                strength=note.strength,
+                rms=note.rms,
+            ),
+        )
+
+    return quantized
 
 
 # =============================================================================
 # ノート密度調整
 # =============================================================================
 
-def filter_notes_by_interval(
-    notes: list[NoteData],
-    min_interval_ms: int,
-) -> list[NoteData]:
+def filter_onset_features_by_interval(
+    onsets: list[OnsetFeature],
+    min_interval_ms: float,
+) -> list[OnsetFeature]:
     """
-    最小間隔より短い間隔のノートを間引く。
-    レーンに関係なく、直前のノートとの時間差でフィルタするため、
-    同時押しは発生しにくい。
+    最小間隔より短い間隔のオンセットを間引く。
 
     Args:
-        notes: 入力ノートリスト
-        min_interval_ms: ノート間の最小間隔（ミリ秒）
+        onsets: オンセット特徴量
+        min_interval_ms: 最小間隔（ミリ秒）
 
     Returns:
-        間引き後のノートリスト
+        間引き後のオンセット特徴量
     """
-    if not notes:
+    if not onsets:
         return []
 
-    # 時間順にソート
-    sorted_notes = sorted(notes, key=lambda n: n.timing)
+    min_interval_sec = min_interval_ms / 1000.0
+    sorted_onsets = sorted(onsets, key=lambda onset: onset.time_sec)
 
-    filtered: list[NoteData] = [sorted_notes[0]]
-    for note in sorted_notes[1:]:
-        # 直前のノートとの間隔をチェック（レーンに関係なく）
-        if note.timing - filtered[-1].timing >= min_interval_ms:
-            filtered.append(note)
+    filtered: list[OnsetFeature] = [sorted_onsets[0]]
+    for onset in sorted_onsets[1:]:
+        if onset.time_sec - filtered[-1].time_sec >= min_interval_sec:
+            filtered.append(onset)
 
     return filtered
 
 
-def apply_difficulty_filter(
+def filter_onsets_by_band(
+    onsets_by_band: dict[str, list[OnsetFeature]],
+    min_interval_ms: float,
+) -> dict[str, list[OnsetFeature]]:
+    """
+    帯域ごとに最小間隔でオンセットを間引く。
+
+    Args:
+        onsets_by_band: 帯域ごとのオンセット特徴量
+        min_interval_ms: 最小間隔（ミリ秒）
+
+    Returns:
+        間引き後のオンセット辞書
+    """
+    return {
+        band_name: filter_onset_features_by_interval(onsets, min_interval_ms)
+        for band_name, onsets in onsets_by_band.items()
+    }
+
+
+def _get_cluster_max_strength(cluster_notes: list[NoteData]) -> float:
+    return max(note.strength for note in cluster_notes)
+
+
+def _get_cluster_max_rms(cluster_notes: list[NoteData]) -> float:
+    return max(note.rms for note in cluster_notes)
+
+
+def select_chord_notes(
+    cluster_notes: list[NoteData],
+    max_chord_notes: int,
+) -> list[NoteData]:
+    """同時押しの上限を超える場合にノートを選別する。"""
+    if len(cluster_notes) <= max_chord_notes:
+        return cluster_notes
+
+    center_lane = 3.5
+    return sorted(
+        cluster_notes,
+        key=lambda note: (abs(note.lane - center_lane), note.lane),
+    )[:max_chord_notes]
+
+
+def merge_notes_with_chords(
     notes: list[NoteData],
-    difficulty: Difficulty,
-    bpm: float,
+    chord_window_ms: int,
+    max_chord_notes: int,
+    local_window_ms: int,
+    strength_percentile: int,
+    rms_percentile: int,
 ) -> list[NoteData]:
     """
-    難易度に応じてノートを間引く（BPMベース）。
+    近接したノートを同時押しとしてまとめる。
 
     Args:
         notes: 入力ノートリスト
-        difficulty: 難易度
-        bpm: BPM
+        chord_window_ms: 同時押しとみなす時間幅（ミリ秒）
+        max_chord_notes: 同時押しの最大数
+        local_window_ms: 強度・音量を評価する時間窓
+        strength_percentile: 同時押しを許可する強度の閾値（パーセンタイル）
+        rms_percentile: 同時押しを許可するRMSの閾値（パーセンタイル）
 
     Returns:
-        間引き後のノートリスト
+        同時押し調整後のノートリスト
     """
-    params = DIFFICULTY_SETTINGS[difficulty]
+    if not notes:
+        return []
 
-    # BPMから最小間隔を計算
-    min_interval_ms = calc_min_interval_ms(bpm, params.note_division)
+    sorted_notes = sorted(notes, key=lambda n: n.timing)
+    timings = [note.timing for note in sorted_notes]
+    strengths = [note.strength for note in sorted_notes]
+    rms_values = [note.rms for note in sorted_notes]
+    half_window_ms = max(local_window_ms // 2, 0)
+    window_start = 0
+    window_end = 0
+    clusters: list[list[NoteData]] = []
+    current_cluster: list[NoteData] = [sorted_notes[0]]
 
-    # 最小間隔でフィルタ（レーンに関係なく）
-    return filter_notes_by_interval(notes, min_interval_ms)
+    for note in sorted_notes[1:]:
+        if note.timing - current_cluster[-1].timing <= chord_window_ms:
+            current_cluster.append(note)
+        else:
+            clusters.append(current_cluster)
+            current_cluster = [note]
+
+    clusters.append(current_cluster)
+
+    merged_notes: list[NoteData] = []
+    for cluster in clusters:
+        if len(cluster) == 1:
+            merged_notes.append(cluster[0])
+            continue
+
+        cluster_time = int(round(median([note.timing for note in cluster])))
+        window_start_time = cluster_time - half_window_ms
+        window_end_time = cluster_time + half_window_ms
+
+        while window_start < len(timings) and timings[window_start] < window_start_time:
+            window_start += 1
+        while window_end < len(timings) and timings[window_end] <= window_end_time:
+            window_end += 1
+
+        local_strengths = strengths[window_start:window_end]
+        local_rms = rms_values[window_start:window_end]
+        strength_threshold = (
+            float(np.percentile(local_strengths, strength_percentile))
+            if local_strengths
+            else 0.0
+        )
+        rms_threshold = (
+            float(np.percentile(local_rms, rms_percentile))
+            if local_rms
+            else 0.0
+        )
+
+        allow_chord = (
+            _get_cluster_max_strength(cluster) >= strength_threshold
+            or _get_cluster_max_rms(cluster) >= rms_threshold
+        )
+        selected_notes = select_chord_notes(
+            cluster,
+            max_chord_notes if allow_chord else 1,
+        )
+        for note in selected_notes:
+            merged_notes.append(
+                NoteData(
+                    lane=note.lane,
+                    timing=cluster_time,
+                    band_name=note.band_name,
+                    strength=note.strength,
+                    rms=note.rms,
+                ),
+            )
+
+    return merged_notes
 
 
 # =============================================================================
@@ -262,11 +460,32 @@ def build_chart(
     Returns:
         生成された譜面データ
     """
-    # オンセットからノート生成
-    notes = generate_notes_from_onsets(analysis.onsets_by_band)
+    params = DIFFICULTY_SETTINGS[difficulty]
+    min_interval_ms = calc_min_interval_ms(analysis.bpm.tempo, params.note_division)
 
-    # 難易度に応じた間引き（BPMベース）
-    notes = apply_difficulty_filter(notes, difficulty, analysis.bpm.tempo)
+    # 帯域ごとにオンセットを間引く
+    filtered_onsets = filter_onsets_by_band(analysis.onsets_by_band, min_interval_ms)
+
+    # オンセットからノート生成
+    notes = generate_notes_from_onsets(filtered_onsets)
+
+    # 最初のビート以降はグリッドに吸着
+    notes = quantize_notes_to_grid(
+        notes,
+        bpm=analysis.bpm.tempo,
+        beat_start_ms=analysis.beat_start_ms,
+        division=QUANTIZE_DIVISION,
+    )
+
+    # 近接ノートを同時押しとしてまとめる
+    notes = merge_notes_with_chords(
+        notes,
+        chord_window_ms=params.chord_window_ms,
+        max_chord_notes=params.max_chord_notes,
+        local_window_ms=params.chord_local_window_ms,
+        strength_percentile=params.chord_strength_percentile,
+        rms_percentile=params.chord_rms_percentile,
+    )
 
     # メタデータ作成
     metadata = ChartMetadata(

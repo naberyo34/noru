@@ -59,6 +59,7 @@ src/
 ├── config/              # 設定ファイル（★重要）
 │   └── GameConfig.ts    # 全ての設定値を集約
 ├── core/                # View非依存のコアロジック
+│   ├── __tests__/       # Core Layer のユニットテスト
 │   ├── ChartData.ts     # 型定義とヘルパー関数
 │   ├── AudioSyncEngine.ts
 │   ├── JudgmentSystem.ts
@@ -453,6 +454,28 @@ const y = note.startY + elapsedFrames * speed; // フレーム依存
 
 ---
 
+## 🐍 Python スクリプトの実行
+
+### venv の使用
+
+`scripts/chart-generator/` には Python の仮想環境（`.venv`）が用意されています。
+Python スクリプトを実行する際は、必ずこの venv を使用してください。
+
+```bash
+# 譜面生成スクリプトの実行例
+cd scripts/chart-generator
+.venv/bin/python main.py input.wav -o output.json
+
+# または絶対パスで
+scripts/chart-generator/.venv/bin/python scripts/chart-generator/main.py ...
+```
+
+**注意：**
+- `python` や `python3` コマンドを直接使わない（システムの Python を使ってしまう）
+- 必ず `.venv/bin/python` を使用すること
+
+---
+
 ## 🔮 将来の拡張ポイント
 
 ### すでに設計済み（実装は未）
@@ -553,7 +576,85 @@ npm run lint  # 自動修正
 
 ---
 
-## 🧪 デバッグ方法
+## 🧪 テスト
+
+### 実行方法
+
+```bash
+npm test        # watch モードで実行
+npm run test:run  # 1回だけ実行
+```
+
+### テストの配置
+
+- **Core Layer のテストのみ**を `src/core/__tests__/` に配置
+- ファイル名は `*.test.ts` 形式（例：`JudgmentSystem.test.ts`）
+- Vitest を使用
+
+### テストの書き方
+
+#### 1. DIパターンを活用する
+
+`AudioSyncEngine` は外部依存（AudioContext, fetch）をコンストラクタで注入可能。テスト時はモックを渡す。
+
+```typescript
+// 本番コード（デフォルト値を使用）
+const engine = new AudioSyncEngine();
+
+// テストコード（モックを注入）
+const engine = new AudioSyncEngine({
+  audioContextFactory: () => fakeAudioContext,
+  fetchFn: fakeFetch,
+});
+```
+
+#### 2. 設定値はハードコードしない
+
+判定ウィンドウなどの設定値をテストで使う場合、定数をインポートして使用する。
+設定値が変更されてもテストが自動追従する。
+
+```typescript
+// ❌ NG: ハードコード
+expect(system.judge(1030, 0, [note])?.judgment).toBe(JudgmentType.PERFECT);
+
+// ✅ OK: 定数を使用
+import { DEFAULT_JUDGMENT_WINDOW } from '../ChartData';
+const { perfect } = DEFAULT_JUDGMENT_WINDOW;
+expect(system.judge(baseTiming + perfect, 0, [note])?.judgment).toBe(JudgmentType.PERFECT);
+```
+
+#### 3. 境界値をテストする
+
+判定システムなど境界が重要なロジックでは、境界値のテストを必ず書く。
+
+```typescript
+// 判定ウィンドウの境界
+expect(system.shouldMiss(baseTiming + bad, note)).toBe(false);     // 境界内
+expect(system.shouldMiss(baseTiming + bad + 1, note)).toBe(true);  // 境界外
+```
+
+#### 4. 実装の流れに沿ったテスト
+
+`initialize()` → `loadAudio()` → `play()` など、実際の使用順序に沿ってテストを書く。
+
+```typescript
+await engine.initialize();
+await engine.loadAudio('test.wav');
+engine.play();
+```
+
+### テスト対象
+
+**テストすべき：**
+- Core Layer（`src/core/*`）- View非依存でテストしやすい
+- ヘルパー関数、計算ロジック、判定システム
+
+**テストしない（現時点）：**
+- Manager Layer、Scene Layer - Phaser依存があり、モックが複雑
+
+---
+
+## 🐛 デバッグ方法
 
 ### 音楽同期のズレ確認
 ```typescript

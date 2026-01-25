@@ -1,16 +1,74 @@
 [
   {
-    "id": "test-song",
-    "title": "Test Song",
-    "artist": "Noru Dev Team",
-    "bpm": 120,
+    "id": "pixel",
+    "title": "Pixel",
+    "artist": "SunoAI",
+    "bpm": 148,
     "difficulties": [
+      {
+        "level": "EASY",
+        "stars": 2,
+        "chartFile": "assets/charts/pixel-easy.json"
+      },
+      {
+        "level": "NORMAL",
+        "stars": 4,
+        "chartFile": "assets/charts/pixel-normal.json"
+      },
+      {
+        "level": "HARD",
+        "stars": 6,
+        "chartFile": "assets/charts/pixel-hard.json"
+      }
+    ],
+    "audioFile": "assets/audio/pixel.wav"
+  },
+  {
+    "id": "candy-heart-bug",
+    "title": "Candy Heart Bug",
+    "artist": "SunoAI",
+    "bpm": 134,
+    "difficulties": [
+      {
+        "level": "EASY",
+        "stars": 2,
+        "chartFile": "assets/charts/candy-heart-bug-easy.json"
+      },
+      {
+        "level": "NORMAL",
+        "stars": 4,
+        "chartFile": "assets/charts/candy-heart-bug-normal.json"
+      },
       {
         "level": "HARD",
         "stars": 5,
-        "chartFile": "assets/charts/test-song-hard.json"
+        "chartFile": "assets/charts/candy-heart-bug-hard.json"
       }
     ],
-    "audioFile": "assets/audio/test-song.wav"
+    "audioFile": "assets/audio/candy-heart-bug.wav"
+  },
+  {
+    "id": "reason-for-being",
+    "title": "Reason for Being",
+    "artist": "SunoAI",
+    "bpm": 128,
+    "difficulties": [
+      {
+        "level": "EASY",
+        "stars": 2,
+        "chartFile": "assets/charts/reason-for-being-easy.json"
+      },
+      {
+        "level": "NORMAL",
+        "stars": 4,
+        "chartFile": "assets/charts/reason-for-being-normal.json"
+      },
+      {
+        "level": "HARD",
+        "stars": 6,
+        "chartFile": "assets/charts/reason-for-being-hard.json"
+      }
+    ],
+    "audioFile": "assets/audio/reason-for-being.wav"
   }
 ]

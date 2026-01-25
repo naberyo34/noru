@@ -199,8 +199,34 @@ export class GameScene extends Phaser.Scene {
   private startGame() {
     if (!this.audioEngine) return;
 
+    // リードイン時間を計算（最初のノートが画面上部から落ちてくる時間を確保）
+    const leadInTime = this.calculateLeadInTime();
+    if (leadInTime > 0) {
+      this.audioEngine.setLeadInTime(leadInTime);
+    }
+
     this.audioEngine.play();
     this.gameStarted = true;
+  }
+
+  /**
+   * リードイン時間を計算
+   * 最初のノートが画面上部から落ちてくるのに必要な時間を算出
+   */
+  private calculateLeadInTime(): number {
+    if (!this.chartData.notes.length) return 0;
+
+    // 最初のノートのタイミングを取得
+    const earliestNoteTiming = this.chartData.notes[0].timing;
+
+    // ノートが画面上部から判定ラインまで落ちてくる時間（デフォルトのハイスピードで計算）
+    const noteTravelTime = GAMEPLAY.NOTE_TRAVEL_TIME;
+
+    // 最初のノートが画面上部から出現するために必要なリードイン時間
+    // earliestNoteTiming が noteTravelTime より小さい場合、その差分が必要
+    const leadInTime = Math.max(0, noteTravelTime - earliestNoteTiming);
+
+    return leadInTime;
   }
 
   update() {
@@ -553,6 +579,5 @@ export class GameScene extends Phaser.Scene {
     if (this.uiManager) {
       this.uiManager.cleanup();
     }
-
   }
 }
